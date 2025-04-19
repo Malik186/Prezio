@@ -2,6 +2,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
+const sendEmail = require('../utils/sendEmail'); // ✅ Import SendGrid utility
 
 exports.register = async (req, res) => {
   const { name, email, password } = req.body;
@@ -13,6 +14,14 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({ name, email, password: hashedPassword });
 
+    // ✅ Send welcome email after registration
+    await sendEmail({
+      to: user.email,
+      subject: 'Welcome to Prezio!',
+      text: `Hello ${user.name}, welcome to Prezio!`,
+      html: `<p>Hello <strong>${user.name}</strong>, welcome to Prezio 🎉</p>`
+    });
+
     const token = generateToken(user._id);
     res.cookie('token', token, {
       httpOnly: true,
@@ -21,6 +30,7 @@ exports.register = async (req, res) => {
 
     res.status(201).json({ user, token });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
