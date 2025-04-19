@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String },
   googleId: { type: String },
+  recoveryKeyHash: {
+    type: String,
+    default: null,
+    select: false, // never return in queries
+  }
 }, {
   timestamps: true
 });

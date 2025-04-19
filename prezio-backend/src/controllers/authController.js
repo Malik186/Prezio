@@ -3,6 +3,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail'); // ✅ Import SendGrid utility
+const generateRecoveryKey = require('../utils/generateRecoveryKey');
 
 exports.register = async (req, res) => {
   const { name, email, password } = req.body;
@@ -14,12 +15,18 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({ name, email, password: hashedPassword });
 
-    // ✅ Send welcome email after registration
+    // Generate recovery key
+    const plainKey = generateRecoveryKey();
+    const hashedKey = await bcrypt.hash(plainKey, 12);
+    user.recoveryKeyHash = hashedKey;
+    await user.save();
+
+    // ✅ Send welcome email with recovery key
     await sendEmail({
       to: user.email,
       subject: 'Welcome to Prezio!',
-      text: `Hello ${user.name}, welcome to Prezio!`,
-      html: `<p>Hello <strong>${user.name}</strong>, welcome to Prezio 🎉</p>`
+      html: `<p>Hello <strong>${user.name}</strong>, welcome to Prezio 🎉</p>
+             <p><strong>Your recovery key (keep it safe!):</strong><br>${plainKey}</p>`
     });
 
     const token = generateToken(user._id);
@@ -28,7 +35,11 @@ exports.register = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    res.status(201).json({ user, token });
+    res.status(201).json({
+      user,
+      token,
+      recoveryKey: plainKey, // show once
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });

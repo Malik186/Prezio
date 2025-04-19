@@ -3,12 +3,21 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
+const passwordRoutes = require('./routes/passwordRoutes');
+const { recoveryLogin } = require('./controllers/passwordController');
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Auth route
 app.use('/api/auth', authRoutes);
+
+// Password reset routes
+app.use('/api/password', passwordRoutes);
+
+// Recovery login route - create a route directly on app
+app.post('/api/recovery-login', recoveryLogin);
 
 module.exports = app;
