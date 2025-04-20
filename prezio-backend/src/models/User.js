@@ -1,5 +1,14 @@
-// src/models/User.js
 const mongoose = require('mongoose');
+
+const sessionSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true },
+  ip: String,
+  device: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -9,8 +18,9 @@ const userSchema = new mongoose.Schema({
   recoveryKeyHash: {
     type: String,
     default: null,
-    select: false, // never return in queries
-  }
+    select: false
+  },
+  sessions: [sessionSchema]
 }, {
   timestamps: true
 });
