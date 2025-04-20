@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const generateRecoveryKey = require('../utils/generateRecoveryKey');
+const generateRecoveryPDF = require('../utils/generateRecoveryPDF');
+const path = require('path');
+const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
 const crypto = require('crypto');
 
@@ -21,6 +24,12 @@ exports.register = async (req, res) => {
     user.recoveryKeyHash = hashedKey;
     await user.save();
 
+    // Generate the recovery PDF and save it to the temp folder
+    const pdfPath = await generateRecoveryPDF({ name, email, recoveryKey: plainKey });
+    
+    // Store the filename for reference (optional)
+    const pdfFilename = path.basename(pdfPath);
+
     await sendEmail({
       to: user.email,
       subject: 'Welcome to Prezio!',
@@ -34,7 +43,23 @@ exports.register = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    res.status(201).json({ user, token, recoveryKey: plainKey });
+    // Send only the JSON response with recovery info
+    res.status(201).json({ 
+      user, 
+      token, 
+      recoveryKey: plainKey,
+      recoveryPdfPath: `/recovery/${pdfFilename}`, // use this path to download
+      message: 'Registration successful! A recovery PDF has been generated.'
+    });
+
+    // Optional: You can still delete the PDF after some time if needed
+    // or implement a separate mechanism to clean up these files
+    setTimeout(() => {
+      fs.unlink(pdfPath, (err) => {
+        if (err) console.error('Error deleting temporary PDF:', err);
+      });
+    }, 5 * 60 * 1000); // Delete after 5 minutes, adjust as needed
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });

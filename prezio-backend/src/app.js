@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 const passwordRoutes = require('./routes/passwordRoutes');
 const { recoveryLogin } = require('./controllers/passwordController');
+const recoveryRoutes = require('./routes/recoveryRoutes');
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
@@ -19,5 +20,8 @@ app.use('/api/password', passwordRoutes);
 
 // Recovery login route - create a route directly on app
 app.post('/api/recovery-login', recoveryLogin);
+
+// Recovery PDF route - serve the PDF from the temp folder
+app.use('/recovery', recoveryRoutes);
 
 module.exports = app;
