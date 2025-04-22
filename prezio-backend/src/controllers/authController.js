@@ -141,6 +141,34 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+exports.updateProfile = async (req, res) => {
+  const updates = {};
+  const allowedFields = [
+    'firstName',
+    'middleName',
+    'surname',
+    'companyName',
+    'phone',
+    'address'
+  ];
+
+  allowedFields.forEach(field => {
+    if (req.body[field]) updates[field] = req.body[field];
+  });
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password -recoveryKeyHash');
+
+    res.status(200).json({ message: 'Profile updated', user: updatedUser });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+};
 
 exports.logout = (req, res) => {
   res.clearCookie('token');
