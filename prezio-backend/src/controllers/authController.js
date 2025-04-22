@@ -170,6 +170,31 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword)
+    return res.status(400).json({ message: 'Both fields are required' });
+
+  try {
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch)
+      return res.status(401).json({ message: 'Incorrect current password' });
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    user.password = hashedNewPassword;
+    await user.save();
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to change password' });
+  }
+};
+
 exports.logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });
