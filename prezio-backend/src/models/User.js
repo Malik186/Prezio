@@ -11,16 +11,31 @@ const sessionSchema = new mongoose.Schema({
 });
 
 const userSchema = new mongoose.Schema({
+  // Basic auth fields
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String },
   googleId: { type: String },
+
+  // Recovery Key
   recoveryKeyHash: {
     type: String,
     default: null,
     select: false
   },
-  sessions: [sessionSchema]
+
+  // Sessions
+  sessions: [sessionSchema],
+
+  // Extended profile fields
+  firstName: { type: String },
+  middleName: { type: String },
+  surname: { type: String },
+  companyName: { type: String },
+  phone: { type: String },
+  address: { type: String },
+  logo: { type: String }, // Cloudinary URL
+
 }, {
   timestamps: true
 });
