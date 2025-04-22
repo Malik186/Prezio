@@ -234,6 +234,27 @@ exports.regenerateAccessKey = async (req, res) => {
   }
 };
 
+exports.uploadLogo = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!req.file || !req.file.path)
+      return res.status(400).json({ message: 'No logo uploaded' });
+
+    user.logo = req.file.path; // Cloudinary secure URL
+    await user.save();
+
+    res.status(200).json({
+      message: 'Logo uploaded successfully',
+      logoUrl: user.logo,
+    });
+  } catch (err) {
+    console.error('Upload logo failed:', err);
+    res.status(500).json({ message: 'Failed to upload logo' });
+  }
+};
+
 exports.logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });

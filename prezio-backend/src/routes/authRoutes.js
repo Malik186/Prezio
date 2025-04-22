@@ -4,7 +4,9 @@ const router = express.Router();
 const { register, login, logout, getProfile, updateProfile } = require('../controllers/authController');
 const { changePassword } = require('../controllers/authController');
 const { regenerateAccessKey } = require('../controllers/authController');
+const authController = require('../controllers/authController');
 const auth = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadLogo');
 const { getSessions, terminateSession } = require('../controllers/sessionController');
 
 router.post('/register', register);
@@ -14,6 +16,7 @@ router.get('/me', auth, getProfile);
 router.patch('/me', auth, updateProfile);
 router.patch('/change-password', auth, changePassword);
 router.post('/regenerate-access-key', auth, regenerateAccessKey);
+router.post('/me/logo', auth, upload.single('logo'), authController.uploadLogo);
 router.get('/sessions', auth, getSessions);
 router.delete('/sessions/:sessionId', auth, terminateSession);
 
