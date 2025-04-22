@@ -195,6 +195,45 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+exports.regenerateAccessKey = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const plainKey = generateRecoveryKey();
+    const hashedKey = await bcrypt.hash(plainKey, 12);
+
+    user.recoveryKeyHash = hashedKey;
+    await user.save();
+
+    const pdfPath = await generateRecoveryPDF({
+      name: user.name,
+      email: user.email,
+      recoveryKey: plainKey
+    });
+
+    const filename = path.basename(pdfPath);
+
+    // Auto delete PDF after 5 mins
+    setTimeout(() => {
+      fs.unlink(pdfPath, (err) => {
+        if (err) console.error('Failed to delete recovery PDF:', err);
+      });
+    }, 5 * 60 * 1000);
+
+    res.status(200).json({
+      message: 'New recovery key generated!',
+      recoveryKey: plainKey,
+      downloadLink: `/recovery/${filename}`
+    });
+
+  } catch (err) {
+    console.error('Access key regeneration failed:', err);
+    res.status(500).json({ message: 'Server error while regenerating access key' });
+  }
+};
+
 exports.logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });
