@@ -34,7 +34,10 @@ const userSchema = new mongoose.Schema({
   companyName: { type: String },
   phone: { type: String },
   address: { type: String },
-  logo: { type: String }, // Cloudinary URL
+  logo: {
+    url: { type: String },   // Cloudinary URL
+    public_id: { type: String }
+  },
 
 }, {
   timestamps: true

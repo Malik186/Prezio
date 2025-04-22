@@ -4,6 +4,7 @@ const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const generateRecoveryKey = require('../utils/generateRecoveryKey');
 const generateRecoveryPDF = require('../utils/generateRecoveryPDF');
+const { cloudinary } = require('../config/cloudinary');
 const path = require('path');
 const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
@@ -239,19 +240,46 @@ exports.uploadLogo = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (!req.file || !req.file.path)
+    if (!req.file || !req.file.path || !req.file.filename)
       return res.status(400).json({ message: 'No logo uploaded' });
 
-    user.logo = req.file.path; // Cloudinary secure URL
+    // Optional: delete previous logo
+    if (user.logo?.public_id) {
+      await cloudinary.uploader.destroy(user.logo.public_id);
+    }
+
+    user.logo = {
+      url: req.file.path, // Cloudinary secure URL
+      public_id: req.file.filename, // public_id from multer-storage-cloudinary
+    };
     await user.save();
 
     res.status(200).json({
       message: 'Logo uploaded successfully',
-      logoUrl: user.logo,
+      logo: user.logo,
     });
   } catch (err) {
     console.error('Upload logo failed:', err);
     res.status(500).json({ message: 'Failed to upload logo' });
+  }
+};
+
+exports.deleteLogo = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user || !user.logo?.public_id) {
+      return res.status(404).json({ message: 'No logo to Remove' });
+    }
+
+    await cloudinary.uploader.destroy(user.logo.public_id);
+
+    user.logo = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Logo Removed successfully' });
+  } catch (err) {
+    console.error('Failed to Remove logo:', err);
+    res.status(500).json({ message: 'Could not delete logo' });
   }
 };
 

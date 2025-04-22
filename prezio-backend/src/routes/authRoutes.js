@@ -17,6 +17,7 @@ router.patch('/me', auth, updateProfile);
 router.patch('/change-password', auth, changePassword);
 router.post('/regenerate-access-key', auth, regenerateAccessKey);
 router.post('/me/logo', auth, upload.single('logo'), authController.uploadLogo);
+router.delete('/me/logo', auth, authController.deleteLogo);
 router.get('/sessions', auth, getSessions);
 router.delete('/sessions/:sessionId', auth, terminateSession);
 
