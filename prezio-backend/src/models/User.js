@@ -34,10 +34,19 @@ const userSchema = new mongoose.Schema({
   companyName: { type: String },
   phone: { type: String },
   address: { type: String },
+
+  // Logo
   logo: {
-    url: { type: String },   // Cloudinary URL
+    url: { type: String },
     public_id: { type: String }
   },
+
+  // Role (admin/user)
+  role: {
+    type: String,
+    enum: ['admin', 'user'],
+    default: 'user'
+  }
 
 }, {
   timestamps: true
