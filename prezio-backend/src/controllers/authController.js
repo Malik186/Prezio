@@ -9,6 +9,12 @@ const path = require('path');
 const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
 const crypto = require('crypto');
+const DEFAULT_LOGOS = [
+  'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409948/default-logo-1_al7thz.png',
+  'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409948/default-logo-2_kaywcs.png',
+  'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409947/default-logo-3_mbvp1t.png',
+  'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409947/default-logo-4_ug6isl.png'
+];
 
 exports.register = async (req, res) => {
   const { name, email, password } = req.body;
@@ -18,17 +24,30 @@ exports.register = async (req, res) => {
     if (userExists) return res.status(400).json({ message: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, email, password: hashedPassword });
+
+    // Determine role
+    const role = email === 'ianmathew186@gmail.com' ? 'admin' : 'user';
+
+    // Random logo assignment
+    const randomLogo = DEFAULT_LOGOS[Math.floor(Math.random() * DEFAULT_LOGOS.length)];
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      logo: {
+        url: randomLogo,
+        public_id: null // No public_id since it's a static default
+      }
+    });
 
     const plainKey = generateRecoveryKey();
     const hashedKey = await bcrypt.hash(plainKey, 12);
     user.recoveryKeyHash = hashedKey;
     await user.save();
 
-    // Generate the recovery PDF and save it to the temp folder
     const pdfPath = await generateRecoveryPDF({ name, email, recoveryKey: plainKey });
-    
-    // Store the filename for reference (optional)
     const pdfFilename = path.basename(pdfPath);
 
     await sendEmail({
@@ -44,22 +63,19 @@ exports.register = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    // Send only the JSON response with recovery info
     res.status(201).json({ 
       user, 
       token, 
       recoveryKey: plainKey,
-      recoveryPdfPath: `/recovery/${pdfFilename}`, // use this path to download
+      recoveryPdfPath: `/recovery/${pdfFilename}`,
       message: 'Registration successful! A recovery PDF has been generated.'
     });
 
-    // Optional: You can still delete the PDF after some time if needed
-    // or implement a separate mechanism to clean up these files
     setTimeout(() => {
       fs.unlink(pdfPath, (err) => {
         if (err) console.error('Error deleting temporary PDF:', err);
       });
-    }, 5 * 60 * 1000); // Delete after 5 minutes, adjust as needed
+    }, 5 * 60 * 1000);
 
   } catch (err) {
     console.error(err);
