@@ -8,6 +8,8 @@ const authController = require('../controllers/authController');
 const auth = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadLogo');
 const { getSessions, terminateSession } = require('../controllers/sessionController');
+const { terminateAccount } = require('../controllers/authController');
+const { abortTermination } = require('../controllers/authController');
 
 router.post('/register', register);
 router.post('/login', login);
@@ -20,5 +22,7 @@ router.post('/me/logo', auth, upload.single('logo'), authController.uploadLogo);
 router.delete('/me/logo', auth, authController.deleteLogo);
 router.get('/sessions', auth, getSessions);
 router.delete('/sessions/:sessionId', auth, terminateSession);
+router.post('/terminate', auth, terminateAccount);
+router.post('/abort-termination', auth, abortTermination);
 
 module.exports = router;

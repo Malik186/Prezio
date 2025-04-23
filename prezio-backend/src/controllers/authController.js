@@ -299,6 +299,51 @@ exports.deleteLogo = async (req, res) => {
   }
 };
 
+exports.terminateAccount = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const user = await User.findById(req.user._id).select('+password');
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Invalid password' });
+
+    user.terminationRequested = true;
+    user.terminationDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    await user.save();
+
+    res.status(200).json({
+      message: 'Account termination scheduled. Your account will be deleted in 7 days.',
+      terminationDate: user.terminationDate
+    });
+  } catch (err) {
+    console.error('Account termination error:', err);
+    res.status(500).json({ message: 'Server error during termination' });
+  }
+};
+
+exports.abortTermination = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!user.terminationRequested || !user.terminationDate) {
+      return res.status(400).json({ message: 'No termination was scheduled for this account' });
+    }
+
+    user.terminationRequested = false;
+    user.terminationDate = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Account termination cancelled successfully' });
+  } catch (err) {
+    console.error('Abort termination error:', err);
+    res.status(500).json({ message: 'Server error while aborting termination' });
+  }
+};
+
+
 exports.logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });

@@ -46,7 +46,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['admin', 'user'],
     default: 'user'
+  },
+
+  // Account Termination
+  // This is a soft delete, the user will be marked as terminated but not removed from the database
+  terminationRequested: {
+    type: Boolean,
+    default: false
+  },
+  terminationDate: {
+    type: Date,
+    default: null
   }
+  
 
 }, {
   timestamps: true
