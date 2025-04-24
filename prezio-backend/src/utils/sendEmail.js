@@ -1,23 +1,28 @@
-const nodemailer = require('nodemailer');
+const formData = require('form-data');
+const Mailgun = require('mailgun.js');
 
-// Create a transporter with settings that match your working PHPMailer configuration
-const transporter = nodemailer.createTransport({
-  host: 'mdskenya.co.ke', // Using the same host as your PHPMailer config
-  port: 587,
-  secure: false, // false for STARTTLS
-  auth: {
-    user: 'noreply@mdskenya.co.ke', // Using hyphenated version as in PHPMailer
-    pass: process.env.EMAIL_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false, // Needed if the certificate name doesn't match
-    ciphers: 'SSLv3' // Adding this for compatibility with older servers
-  }
+// Initialize Mailgun client
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({
+  username: 'api',
+  key: process.env.MAILGUN_API_KEY
 });
 
+// Define a default sender if environment variable is missing
+const DEFAULT_FROM = `Prezio App <postmaster@${process.env.MAILGUN_DOMAIN}>`;
+
 const sendEmail = async ({ to, subject, text, html }) => {
+  // Use environment variable or default sender if not available
+  const fromEmail = process.env.FROM_EMAIL || DEFAULT_FROM;
+  
+  //console.log('Sending email with Mailgun:');
+  //console.log('- Domain:', process.env.MAILGUN_DOMAIN);
+  //console.log('- From:', fromEmail);
+  //console.log('- To:', to);
+  //console.log('- Subject:', subject);
+  
   const msg = {
-    from: 'noreply@mdskenya.co.ke', // Using hyphenated version
+    from: fromEmail,
     to,
     subject,
     text: text || '',
@@ -25,25 +30,21 @@ const sendEmail = async ({ to, subject, text, html }) => {
   };
 
   try {
-    const info = await transporter.sendMail(msg);
+    //console.log('Making API request to Mailgun...');
+    const response = await mg.messages.create(
+      process.env.MAILGUN_DOMAIN,
+      msg
+    );
+    
     console.log(`📩 Email sent successfully to ${to}`);
-    return info;
+    return response;
   } catch (error) {
     console.error(`❌ Email failed to send: ${error.message}`);
-    if (error.response) {
-      console.error('Error details:', error.response);
+    if (error.details) {
+      console.error('Error details:', error.details);
     }
     throw error;
   }
 };
-
-// Test connection on startup
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error('SMTP connection error:', error);
-  } else {
-    console.log('SMTP server is ready to take our messages');
-  }
-});
 
 module.exports = sendEmail;
