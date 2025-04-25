@@ -48,6 +48,18 @@ const userSchema = new mongoose.Schema({
     default: 'user'
   },
 
+  // Two-Factor Authentication
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorSecret: {
+    type: String,
+    select: false // prevent exposing it
+  },
+  twoFactorTempSecret: { type: String },
+
+
   // Account Termination
   // This is a soft delete, the user will be marked as terminated but not removed from the database
   terminationRequested: {
@@ -58,7 +70,7 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   }
-  
+
 
 }, {
   timestamps: true

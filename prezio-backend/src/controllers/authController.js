@@ -89,7 +89,7 @@ exports.login = async (req, res) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const userAgent = req.headers['user-agent'];
   const deviceInfo = getDeviceDetails(userAgent);
-  const deviceString = deviceInfo.full;
+  const deviceString = `${deviceInfo.browser} on ${deviceInfo.os}`;
 
   try {
     const user = await User.findOne({ email });
@@ -99,10 +99,19 @@ exports.login = async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const sessionId = crypto.randomUUID();
-    const deviceString = `${deviceInfo.browser} on ${deviceInfo.os}`;
+    // 2FA logic: if enabled, pause here and require OTP
+    if (user.twoFactorEnabled) {
+      req.session = req.session || {};
+      req.session.pending2FA = {
+        userId: user._id,
+        ip,
+        device: deviceString,
+      };
+      return res.status(206).json({ message: '2FA_REQUIRED' }); // 206: Partial Content
+    }
 
-    // Match field names with your schema
+    // If 2FA not enabled, continue as usual
+    const sessionId = crypto.randomUUID();
     const newSession = {
       sessionId,
       ip,
@@ -130,6 +139,7 @@ exports.login = async (req, res) => {
               </ul>
               <p>If this wasn't you, please log in and terminate the session immediately.</p>`
       });
+
       await logSecurityEvent({
         userId: user._id,
         action: 'New Device Login',
@@ -150,6 +160,7 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 exports.getProfile = async (req, res) => {
   try {
