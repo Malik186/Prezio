@@ -146,12 +146,17 @@ exports.login = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select(
-      '-password -recoveryKeyHash'
-    );
+    const user = await User.findById(req.user._id)
+      .select('-password -recoveryKeyHash -__v');
+
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    res.status(200).json({ user });
+    const profile = {
+      ...user.toObject(),
+      lastUpdated: user.updatedAt,
+    };
+
+    res.status(200).json({ user: profile });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to fetch profile' });
