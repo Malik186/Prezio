@@ -1,10 +1,29 @@
 // src/utils/generateRecoveryKey.js
 const crypto = require('crypto');
 
+/**
+ * Generates a user-friendly recovery key in format: XXXX-XXXX-XXXX-XXXX
+ * * The key consists of 4 groups of 4 alphanumeric characters, excluding ambiguous characters.
+ */
 const generateRecoveryKey = () => {
-  return crypto.randomBytes(24).toString('hex'); // ~32 char
+  // Create 4 groups of 4 alphanumeric characters (excluding ambiguous characters)
+  const allowedChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars like O/0, I/1
+  let key = '';
+  
+  // Generate 4 groups of 4 characters
+  for (let group = 0; group < 4; group++) {
+    for (let i = 0; i < 4; i++) {
+      const randomIndex = crypto.randomInt(0, allowedChars.length);
+      key += allowedChars[randomIndex];
+    }
+    
+    // Add hyphen between groups (except after the last group)
+    if (group < 3) {
+      key += '-';
+    }
+  }
+  
+  return key; // Format: XXXX-XXXX-XXXX-XXXX
 };
 
 module.exports = generateRecoveryKey;
-// This function generates a random recovery key using the crypto module. It creates a buffer of 24 random bytes and converts it to a hexadecimal string, resulting in a string of approximately 32 characters. This key can be used for password recovery.
-// The generated key is exported as a module so it can be used in other parts of the application, such as when creating a password reset request or when generating a recovery key for a user.
