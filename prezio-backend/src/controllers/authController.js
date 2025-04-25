@@ -10,6 +10,11 @@ const path = require('path');
 const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
 const crypto = require('crypto');
+const { 
+  createWelcomeEmail, 
+  createLoginAlertEmail, 
+  createPasswordResetEmail 
+} = require('../utils/emailTemplates');
 const DEFAULT_LOGOS = [
   'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409948/default-logo-1_al7thz.png',
   'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409948/default-logo-2_kaywcs.png',
@@ -54,8 +59,7 @@ exports.register = async (req, res) => {
     await sendEmail({
       to: user.email,
       subject: 'Welcome to Prezio!',
-      html: `<p>Hello <strong>${user.name}</strong>, welcome to Prezio 🎉</p>
-             <p><strong>Your recovery key (keep it safe!):</strong><br>${plainKey}</p>`
+      html: createWelcomeEmail(user, plainKey)
     });
 
     const token = generateToken(user._id);
@@ -130,14 +134,7 @@ exports.login = async (req, res) => {
       await sendEmail({
         to: user.email,
         subject: '🔐 New Login Detected',
-        html: `<p>Hello ${user.name},</p>
-              <p>A new login to your account was detected:</p>
-              <ul>
-                <li><strong>IP:</strong> ${ip}</li>
-                <li><strong>Device:</strong> ${deviceString}</li>
-                <li><strong>Time:</strong> ${new Date().toLocaleString()}</li>
-              </ul>
-              <p>If this wasn't you, please log in and terminate the session immediately.</p>`
+        html: createLoginAlertEmail(user, ip, deviceString)
       });
 
       await logSecurityEvent({

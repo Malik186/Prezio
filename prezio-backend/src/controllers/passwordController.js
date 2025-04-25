@@ -4,6 +4,8 @@ const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
 const generateCode = require('../utils/generateCode');
 const bcrypt = require('bcryptjs');
+const { createPasswordResetEmail } = require('../utils/emailTemplates');
+
 
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
@@ -24,8 +26,7 @@ exports.forgotPassword = async (req, res) => {
     await sendEmail({
       to: email,
       subject: 'Prezio Password Reset Code',
-      text: `Your Prezio login code is ${code}. It expires in 10 minutes.`,
-      html: `<p>Your <strong>Prezio</strong> access code is:</p><h2>${code}</h2><p>This code will expire in 10 minutes.</p>`,
+      html: createPasswordResetEmail(email, code)
     });
 
     res.status(200).json({ message: 'Reset code sent to email' });
