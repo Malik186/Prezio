@@ -1,28 +1,19 @@
-const formData = require('form-data');
-const Mailgun = require('mailgun.js');
+const { Resend } = require('resend');
 
-// Initialize Mailgun client
-const mailgun = new Mailgun(formData);
-const mg = mailgun.client({
-  username: 'api',
-  key: process.env.MAILGUN_API_KEY
-});
+// Initialize Resend client
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Define a default sender if environment variable is missing
-const DEFAULT_FROM = `Prezio App <postmaster@${process.env.MAILGUN_DOMAIN}>`;
+const DEFAULT_FROM = process.env.FROM_EMAIL || 'Prezio App <info@mdskenya.com>';
 
 const sendEmail = async ({ to, subject, text, html }) => {
-  // Use environment variable or default sender if not available
-  const fromEmail = process.env.FROM_EMAIL || DEFAULT_FROM;
-  
-  //console.log('Sending email with Mailgun:');
-  //console.log('- Domain:', process.env.MAILGUN_DOMAIN);
-  //console.log('- From:', fromEmail);
+  //console.log('Sending email with Resend:');
+  //console.log('- From:', DEFAULT_FROM);
   //console.log('- To:', to);
   //console.log('- Subject:', subject);
   
   const msg = {
-    from: fromEmail,
+    from: DEFAULT_FROM,
     to,
     subject,
     text: text || '',
@@ -30,13 +21,9 @@ const sendEmail = async ({ to, subject, text, html }) => {
   };
 
   try {
-    //console.log('Making API request to Mailgun...');
-    const response = await mg.messages.create(
-      process.env.MAILGUN_DOMAIN,
-      msg
-    );
+    const response = await resend.emails.send(msg);
     
-    console.log(`📩 Email sent successfully to ${to}`);
+    //console.log(`📩 Email sent successfully to ${to}`);
     return response;
   } catch (error) {
     console.error(`❌ Email failed to send: ${error.message}`);
