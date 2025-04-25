@@ -4,6 +4,7 @@ const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const generateRecoveryKey = require('../utils/generateRecoveryKey');
 const generateRecoveryPDF = require('../utils/generateRecoveryPDF');
+const { logSecurityEvent } = require('./securityController');
 const { cloudinary } = require('../config/cloudinary');
 const path = require('path');
 const fs = require('fs');
@@ -63,9 +64,9 @@ exports.register = async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    res.status(201).json({ 
-      user, 
-      token, 
+    res.status(201).json({
+      user,
+      token,
       recoveryKey: plainKey,
       recoveryPdfPath: `/recovery/${pdfFilename}`,
       message: 'Registration successful! A recovery PDF has been generated.'
@@ -128,6 +129,12 @@ exports.login = async (req, res) => {
                 <li><strong>Time:</strong> ${new Date().toLocaleString()}</li>
               </ul>
               <p>If this wasn't you, please log in and terminate the session immediately.</p>`
+      });
+      await logSecurityEvent({
+        userId: user._id,
+        action: 'New Device Login',
+        ip: ip,
+        device: userAgent
       });
     }
 
@@ -210,6 +217,13 @@ exports.changePassword = async (req, res) => {
     user.password = hashedNewPassword;
     await user.save();
 
+    await logSecurityEvent({
+      userId: user._id,
+      action: 'Password Changed',
+      ip: req.ip,
+      device: req.headers['user-agent']
+    });
+
     res.status(200).json({ message: 'Password updated successfully' });
   } catch (err) {
     console.error(err);
@@ -228,6 +242,13 @@ exports.regenerateAccessKey = async (req, res) => {
 
     user.recoveryKeyHash = hashedKey;
     await user.save();
+
+    await logSecurityEvent({
+      userId: user._id,
+      action: 'Recovery Key Generated',
+      ip: req.ip,
+      device: req.headers['user-agent']
+    });
 
     const pdfPath = await generateRecoveryPDF({
       name: user.name,
@@ -317,6 +338,13 @@ exports.terminateAccount = async (req, res) => {
     user.terminationRequested = true;
     user.terminationDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
     await user.save();
+
+    await logSecurityEvent({
+      userId: user._id,
+      action: 'Account Termination Requested',
+      ip: req.ip,
+      device: req.headers['user-agent']
+    });
 
     res.status(200).json({
       message: 'Account termination scheduled. Your account will be deleted in 7 days.',

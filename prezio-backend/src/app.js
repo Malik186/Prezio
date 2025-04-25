@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const passwordRoutes = require('./routes/passwordRoutes');
 const { recoveryLogin } = require('./controllers/passwordController');
 const recoveryRoutes = require('./routes/recoveryRoutes');
+const securityRoutes = require('./routes/securityRoutes');
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
@@ -23,5 +24,10 @@ app.post('/api/recovery-login', recoveryLogin);
 
 // Recovery PDF route - serve the PDF from the temp folder
 app.use('/recovery', recoveryRoutes);
+
+// Security routes
+
+app.use('/api/security', securityRoutes);
+
 
 module.exports = app;
