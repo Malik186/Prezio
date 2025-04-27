@@ -31,4 +31,18 @@ const protect = async (req, res, next) => {
   }
 };
 
+/**
+ * Admin-only middleware
+ * Checks if the authenticated user has admin role
+ * Must be used after the protect middleware
+ */
+const adminOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied. Admins only.' });
+  }
+  next();
+};
+
+// Maintain the original default export for backward compatibility
+protect.adminOnly = adminOnly;
 module.exports = protect;

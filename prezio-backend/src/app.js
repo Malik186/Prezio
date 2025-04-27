@@ -9,6 +9,7 @@ const recoveryRoutes = require('./routes/recoveryRoutes');
 const securityRoutes = require('./routes/securityRoutes');
 const twoFactorRoutes = require('./routes/twoFactorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
@@ -36,5 +37,14 @@ app.use('/api/two-factor', twoFactorRoutes);
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);
+
+/**
+ * Admin-only Routes
+ * Checks if the authenticated user has admin role
+ * Goes after the protect middleware
+ */
+
+// Admin routes
+app.use('/api/admin', adminRoutes);
 
 module.exports = app;
