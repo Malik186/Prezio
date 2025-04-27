@@ -364,9 +364,124 @@ const createWelcomeEmail = (user, plainKey) => {
     </html>
     `;
   };
+
+  const createCronErrorEmail = (jobName, error, timestamp) => {
+    const formattedDate = new Date(timestamp).toLocaleString('en-US', {
+      dateStyle: 'medium', 
+      timeStyle: 'medium'
+    });
+  
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Cron Job Error Alert</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333333;
+          margin: 0;
+          padding: 0;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          text-align: center;
+          padding: 20px 0;
+          background-color: #f8f9fa;
+          border-bottom: 3px solid #e74c3c;
+        }
+        .header img {
+          max-height: 60px;
+        }
+        .content {
+          padding: 30px 20px;
+          background-color: #ffffff;
+        }
+        .footer {
+          text-align: center;
+          padding: 20px;
+          font-size: 12px;
+          color: #666666;
+          background-color: #f8f9fa;
+        }
+        h1 {
+          color: #e74c3c;
+          margin-top: 0;
+        }
+        .error-container {
+          background-color: #fff5f5;
+          border: 1px solid #e74c3c;
+          border-left: 5px solid #e74c3c;
+          border-radius: 6px;
+          padding: 15px;
+          margin: 20px 0;
+        }
+        .error-title {
+          color: #e74c3c;
+          font-weight: bold;
+          margin-top: 0;
+        }
+        .error-details {
+          font-family: monospace;
+          background-color: #f9f9f9;
+          padding: 12px;
+          border-radius: 4px;
+          white-space: pre-wrap;
+          overflow-x: auto;
+        }
+        .timestamp {
+          color: #666666;
+          font-style: italic;
+        }
+        .divider {
+          height: 1px;
+          background-color: #e1e1e1;
+          margin: 25px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="https://res.cloudinary.com/dqmo5qzze/image/upload/v1745590700/prezio-logo_d86yas.png" alt="Prezio Logo">
+        </div>
+        <div class="content">
+          <h1>⚠️ Cron Job Error Alert</h1>
+          <p>A scheduled task has encountered an error and failed to complete:</p>
+          
+          <div class="error-container">
+            <h3 class="error-title">Job: ${jobName}</h3>
+            <p class="timestamp">Occurred at: ${formattedDate}</p>
+            <p><strong>Error Details:</strong></p>
+            <div class="error-details">${error.stack || error.message || String(error)}</div>
+          </div>
+          
+          <p>Please investigate this issue as soon as possible to ensure system reliability.</p>
+          
+          <div class="divider"></div>
+          
+          <p>This is an automated notification from the Prezio system monitoring service.</p>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Prezio. All rights reserved.</p>
+          <p>Suite 34 The Stables, Karen Road, Nairobi Kenya</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+  };
   
   module.exports = {
     createWelcomeEmail,
     createLoginAlertEmail,
-    createPasswordResetEmail
+    createPasswordResetEmail,
+    createCronErrorEmail
   };
