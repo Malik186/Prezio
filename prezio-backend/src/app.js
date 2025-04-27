@@ -8,6 +8,7 @@ const { recoveryLogin } = require('./controllers/passwordController');
 const recoveryRoutes = require('./routes/recoveryRoutes');
 const securityRoutes = require('./routes/securityRoutes');
 const twoFactorRoutes = require('./routes/twoFactorRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
@@ -32,5 +33,8 @@ app.use('/api/security', securityRoutes);
 
 // Two-factor authentication routes
 app.use('/api/two-factor', twoFactorRoutes);
+
+// Notification routes
+app.use('/api/notifications', notificationRoutes);
 
 module.exports = app;

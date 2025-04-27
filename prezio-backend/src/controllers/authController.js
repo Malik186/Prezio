@@ -9,11 +9,12 @@ const { cloudinary } = require('../config/cloudinary');
 const path = require('path');
 const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
+const { sendNotification } = require('../services/notificationService');
 const crypto = require('crypto');
-const { 
-  createWelcomeEmail, 
-  createLoginAlertEmail, 
-  createPasswordResetEmail 
+const {
+  createWelcomeEmail,
+  createLoginAlertEmail,
+  createPasswordResetEmail
 } = require('../utils/emailTemplates');
 const DEFAULT_LOGOS = [
   'https://res.cloudinary.com/dqmo5qzze/image/upload/v1745409948/default-logo-1_al7thz.png',
@@ -137,6 +138,13 @@ exports.login = async (req, res) => {
         html: createLoginAlertEmail(user, ip, deviceString)
       });
 
+      await sendNotification({
+        userId: user._id,
+        title: 'New Device Login',
+        body: `We detected a login from a new device (${deviceString}). If this wasn't you, please secure your account.`,
+        type: 'warning'
+      });
+
       await logSecurityEvent({
         userId: user._id,
         action: 'New Device Login',
@@ -224,6 +232,14 @@ exports.changePassword = async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedNewPassword;
     await user.save();
+
+    //Send Notification for Password Changed
+    await sendNotification({
+      userId: user._id,
+      title: 'Password Changed',
+      body: 'You have successfully changed your account password.',
+      type: 'success'
+    });
 
     await logSecurityEvent({
       userId: user._id,
