@@ -6,6 +6,8 @@ const { registerCronJob } = require('../utils/cronManager');
 
 const startAccountCleanupJob = () => {
   // Store the cron job in a variable
+  // Schedule the job to run every day at midnight
+  // This job will delete users that are older than 7 days and have requested termination
   const job = cron.schedule('0 0 * * *', safeCron('Account Cleanup', async () => {
     const now = new Date();
     const usersToDelete = await User.find({
