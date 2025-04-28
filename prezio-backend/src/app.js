@@ -9,6 +9,7 @@ const recoveryRoutes = require('./routes/recoveryRoutes');
 const securityRoutes = require('./routes/securityRoutes');
 const twoFactorRoutes = require('./routes/twoFactorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const clientRoutes = require('./routes/clientRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
@@ -37,6 +38,9 @@ app.use('/api/two-factor', twoFactorRoutes);
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);
+
+// Client routes
+app.use('/api/clients', clientRoutes);
 
 /**
  * Admin-only Routes
