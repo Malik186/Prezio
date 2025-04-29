@@ -41,6 +41,12 @@ const userSchema = new mongoose.Schema({
     public_id: { type: String }
   },
 
+  // last quotation number
+  lastQuoteNumber: {
+    type: Number,
+    default: 0
+  },  
+
   // Role (admin/user)
   role: {
     type: String,
