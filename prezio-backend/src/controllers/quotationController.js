@@ -88,30 +88,48 @@ exports.createQuotation = asyncHandler(async (req, res) => {
   
   //
   exports.previewQuotation = asyncHandler(async (req, res) => {
-    const quotation = await Quotation.findById(req.params.id)
-      .populate('template')
-      .populate('client');
-  
-    if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
-  
-    const templatePath = path.join(__dirname, '..', 'templates', quotation.template.fileName);
-    const templateHtml = fs.readFileSync(templatePath, 'utf-8');
-    const compiled = Handlebars.compile(templateHtml);
-  
-    const html = compiled({
-      quotation,
-      client: quotation.clientSnapshot,
-      user: quotation.creatorSnapshot,
-      lineItems: quotation.lineItems,
-      subtotal: quotation.subtotal,
-      tax: quotation.tax,
-      total: quotation.total,
-      discount: quotation.discount,
-      currency: quotation.currency,
-      validUntil: quotation.validUntil
-    });
-  
-    res.send(html);
+    try {
+      const quotation = await Quotation.findById(req.params.id)
+        .populate('template')
+        .populate('client');
+    
+      if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+    
+      // Using the same path resolution approach as in templateController
+      const templatePath = path.resolve(process.cwd(), 'src', 'templates', quotation.template.fileName);
+      
+      // Check if template file exists
+      if (!fs.existsSync(templatePath)) {
+        return res.status(404).json({ 
+          message: 'Template file not found', 
+          path: templatePath 
+        });
+      }
+      
+      const templateHtml = fs.readFileSync(templatePath, 'utf-8');
+      const compiled = Handlebars.compile(templateHtml);
+    
+      const html = compiled({
+        quotation,
+        client: quotation.clientSnapshot,
+        user: quotation.creatorSnapshot,
+        lineItems: quotation.lineItems,
+        subtotal: quotation.subtotal,
+        tax: quotation.tax,
+        total: quotation.total,
+        discount: quotation.discount,
+        currency: quotation.currency,
+        validUntil: quotation.validUntil
+      });
+    
+      res.send(html);
+    } catch (error) {
+      console.error('Error previewing quotation:', error);
+      res.status(500).json({ 
+        message: 'Error generating quotation preview', 
+        error: error.message 
+      });
+    }
   });
 
   // POST /api/quotations/:id/send
