@@ -32,6 +32,11 @@ const lineItemSchema = new mongoose.Schema({
 const quotationSchema = new mongoose.Schema({
 
     // Basic Fields
+    template: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Template',
+        required: true
+      },
     quoteName: {
         type: String,
         required: true,
