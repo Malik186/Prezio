@@ -11,7 +11,7 @@ exports.uploadTemplate = asyncHandler(async (req, res) => {
 
   const templateFile = req.files.templateFile;
   const fileName = `${Date.now()}-${templateFile.name}`;
-  const savePath = path.join(__dirname, '../../templates', fileName);
+  const savePath = path.join(__dirname, '../templates', fileName);
 
   await templateFile.mv(savePath);
 
