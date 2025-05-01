@@ -14,7 +14,11 @@ const quotationRoutes = require('./routes/quotationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+// Update your backend CORS configuration
+app.use(cors({
+  origin: '*',  // Allow requests from any origin
+  credentials: true
+}));
 app.use(express.json());
 app.use(cookieParser());
 

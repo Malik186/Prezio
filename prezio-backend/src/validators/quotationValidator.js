@@ -20,6 +20,7 @@ const lineItemSchema = Joi.object({
 const createQuotationSchema = Joi.object({
   quoteName: Joi.string().required().messages({ 'any.required': 'Quote name is required' }),
   validUntil: Joi.date().required(),
+  template: Joi.string().length(24).required(), // MongoDB ObjectId
   client: Joi.string().length(24).required(), // MongoDB ObjectId
   lineItems: Joi.array().items(lineItemSchema).min(1).required(),
   discount: Joi.number().min(0).default(0),

@@ -478,10 +478,179 @@ const createWelcomeEmail = (user, plainKey) => {
     </html>
     `;
   };
+
+  const createQuotationEmail = (quotation, quotationUrl) => {
+    const { 
+      clientSnapshot, 
+      creatorSnapshot,
+      quoteNumber, 
+      quoteName,
+      validUntil,
+      currency,
+      total
+    } = quotation;
+  
+    // Format the date
+    const formattedValidUntil = new Date(validUntil).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  
+    // Format the total amount
+    const formattedTotal = new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: currency || 'USD' 
+    }).format(total);
+  
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>New Quotation from ${creatorSnapshot.companyName}</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          line-height: 1.6;
+          color: #333333;
+          margin: 0;
+          padding: 0;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          text-align: center;
+          padding: 20px 0;
+          background-color: #f8f9fa;
+          border-bottom: 3px solid #0066ff;
+        }
+        .header img {
+          max-height: 60px;
+        }
+        .content {
+          padding: 30px 20px;
+          background-color: #ffffff;
+        }
+        .footer {
+          text-align: center;
+          padding: 20px;
+          font-size: 12px;
+          color: #666666;
+          background-color: #f8f9fa;
+        }
+        h1 {
+          color: #0066ff;
+          margin-top: 0;
+        }
+        .quote-details {
+          background-color: #f7f7f7;
+          border: 1px solid #e1e1e1;
+          border-radius: 6px;
+          padding: 20px;
+          margin: 25px 0;
+        }
+        .quote-number {
+          font-family: monospace;
+          font-size: 20px;
+          color: #0066ff;
+          margin-bottom: 10px;
+        }
+        .expiry {
+          color: #ff3b30;
+          font-size: 14px;
+          margin-top: 10px;
+        }
+        .divider {
+          height: 1px;
+          background-color: #e1e1e1;
+          margin: 25px 0;
+        }
+        .note {
+          font-size: 14px;
+          background-color: #f0f7ff;
+          border-left: 4px solid #0066ff;
+          padding: 15px;
+          margin-top: 25px;
+        }
+        .button {
+          display: inline-block;
+          background-color: #0066ff;
+          color: white;
+          text-decoration: none;
+          padding: 12px 25px;
+          border-radius: 4px;
+          font-weight: bold;
+          margin: 20px 0;
+        }
+        .button:hover {
+          background-color: #0055cc;
+        }
+        .text-center {
+          text-align: center;
+        }
+        .company-info {
+          margin-top: 20px;
+          font-style: italic;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${creatorSnapshot.logo && creatorSnapshot.logo.url ? 
+            `<img src="${creatorSnapshot.logo.url}" alt="${creatorSnapshot.companyName} Logo">` : 
+            `<h2>${creatorSnapshot.companyName}</h2>`
+          }
+        </div>
+        <div class="content">
+          <h1>Quotation: ${quoteName}</h1>
+          <p>Dear ${clientSnapshot.name},</p>
+          <p>Thank you for your interest in our products/services. We're pleased to provide you with the following quotation:</p>
+          
+          <div class="quote-details">
+            <div class="quote-number">Quotation Number: ${quoteNumber}</div>
+            <p><strong>Total Amount:</strong> ${formattedTotal}</p>
+            <p class="expiry">Valid until: ${formattedValidUntil}</p>
+          </div>
+          
+          <div class="text-center">
+            <a href="${quotationUrl}" class="button">View Complete Quotation</a>
+          </div>
+          
+          <div class="note">
+            <p>To view the detailed quotation with all product/service information, please click the button above or use the link below:</p>
+            <p><a href="${quotationUrl}">${quotationUrl}</a></p>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <p>If you have any questions or would like to discuss this quotation further, please don't hesitate to contact us at <a href="mailto:${creatorSnapshot.email}">${creatorSnapshot.email}</a>${creatorSnapshot.phone ? ` or by phone at ${creatorSnapshot.phone}` : ''}.</p>
+          
+          <div class="company-info">
+            <p>Best regards,</p>
+            <p><strong>${creatorSnapshot.companyName}</strong></p>
+            ${creatorSnapshot.address ? `<p>${creatorSnapshot.address}</p>` : ''}
+          </div>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} ${creatorSnapshot.companyName}. All rights reserved.</p>
+          ${creatorSnapshot.address ? `<p>${creatorSnapshot.address}</p>` : ''}
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+  };
   
   module.exports = {
     createWelcomeEmail,
     createLoginAlertEmail,
     createPasswordResetEmail,
-    createCronErrorEmail
+    createCronErrorEmail,
+    createQuotationEmail
   };

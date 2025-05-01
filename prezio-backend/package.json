@@ -32,7 +32,6 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdfkit": "^0.17.0",
-    "puppeteer": "^24.7.2",
     "qrcode": "^1.5.4",
     "resend": "^4.4.1",
     "speakeasy": "^2.0.0"
