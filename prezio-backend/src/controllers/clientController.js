@@ -6,45 +6,26 @@ const { sendNotification } = require('../services/notificationService');
 // @desc    Create a new client
 // @route   POST /api/clients
 // @access  Private
+TODO // Include a Validator here
 exports.createClient = async (req, res) => {
-    // Validate request body using Joi schema
-    const { error } = clientValidationSchema.validate(req.body);
-    if (error) {
-        return res.status(400).json({
-            message: 'Please fill out all required fields correctly.',
-            details: error.details[0].message
-        });
-    }
-
-    // Extract fields from validated request body
     const { clientName, clientAddress, contactPersonName, contactPersonPhone, contactPersonEmail } = req.body;
-
-    // Create new client
-    const client = new Client({
-        user: req.user._id,
-        clientName,
-        clientAddress,
-        contactPersonName,
-        contactPersonPhone,
-        contactPersonEmail
-    });
-
-    // Save client to database
-    try {
-        await client.save();
-        // Send notification to user about new client creation
-            await sendNotification({
-              userId: user._id,
-              title: 'New Client Created',
-              body: `You have successfully created a new client: ${clientName}.`,
-              type: 'success'
-            });
-
-        res.status(201).json(client);
-    } catch (err) {
-        res.status(500).json({ message: 'Error creating client', error: err.message });
+  
+    if (!clientName || !clientAddress || !contactPersonName || !contactPersonPhone || !contactPersonEmail) {
+      return res.status(400).json({ message: 'Please provide all required fields.' });
     }
-};
+  
+    const client = new Client({
+      user: req.user._id,
+      clientName,
+      clientAddress,
+      contactPersonName,
+      contactPersonPhone,
+      contactPersonEmail
+    });
+  
+    await client.save();
+    res.status(201).json(client);
+  };
 
 // @desc    Get all clients for logged-in user
 // @route   GET /api/clients
