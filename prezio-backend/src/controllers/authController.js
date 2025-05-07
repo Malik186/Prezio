@@ -193,8 +193,13 @@ exports.updateProfile = async (req, res) => {
     'middleName',
     'surname',
     'companyName',
+    'position',
     'phone',
-    'address'
+    'address',
+    'quoteTerms',
+    'invoiceTerms',
+    'receiptTerms',
+    'estimateTerms'
   ];
 
   allowedFields.forEach(field => {
