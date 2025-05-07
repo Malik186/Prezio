@@ -6,7 +6,7 @@ const { sendNotification } = require('../services/notificationService');
 // @desc    Create a new client
 // @route   POST /api/clients
 // @access  Private
-TODO // Include a Validator here
+//TODO  Include a Validator here
 exports.createClient = async (req, res) => {
     const { clientName, clientAddress, contactPersonName, contactPersonPhone, contactPersonEmail } = req.body;
   

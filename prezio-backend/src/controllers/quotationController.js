@@ -19,11 +19,13 @@ exports.createQuotation = asyncHandler(async (req, res) => {
     lineItems,
     currency,
     quoteName,
+    projectDescription,
+    notes,
     discount = 0,
     template: templateId
   } = req.body;
 
-  if (!clientId || !lineItems?.length || !validUntil || !currency || !quoteName || !templateId) {
+  if (!clientId || !lineItems?.length || !validUntil || !currency || !quoteName || !projectDescription  || !notes || !templateId) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -59,6 +61,8 @@ exports.createQuotation = asyncHandler(async (req, res) => {
   const quotation = await Quotation.create({
     quoteNumber,
     quoteName,
+    projectDescription,
+    notes,
     validUntil,
     client: client._id,
     creator: user._id,
@@ -78,13 +82,18 @@ exports.createQuotation = asyncHandler(async (req, res) => {
     },
     creatorSnapshot: {
       companyName: user.companyName || '',
+      position: user.position || '',
+      firstName: user.firstName || '',
+      middleName: user.middleName || '',
+      surname: user.surname || '',
       logo: {
         url: user.logo?.url || '',
         public_id: user.logo?.public_id || ''
       },
       email: user.email,
       phone: user.phone || '',
-      address: user.address || ''
+      address: user.address || '',
+      quoteTerms: user.quoteTerms || ''
     }
   });
 
@@ -189,6 +198,9 @@ exports.previewQuotation = asyncHandler(async (req, res) => {
       tax: plainQuotation.tax,
       total: plainQuotation.total,
       discount: plainQuotation.discount,
+      quoteName: plainQuotation.quoteName,
+      projectDescription: plainQuotation.projectDescription,
+      notes: plainQuotation.notes,
       currency: plainQuotation.currency,
       validUntil: plainQuotation.validUntil,
       // Include metadata for PDF generation

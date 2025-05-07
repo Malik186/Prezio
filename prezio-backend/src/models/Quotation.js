@@ -41,6 +41,14 @@ const quotationSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    projectDescription: {
+        type: String,
+        required: true,
+    },
+    notes: {
+        type: String,
+        default: ''
+    },
     quoteNumber: {
         type: String,
         required: true,
@@ -82,13 +90,18 @@ const quotationSchema = new mongoose.Schema({
     },
     creatorSnapshot: {
         companyName: String,
+        position: String,
+        firstName: String,
+        middleName: String,
+        surname: String,
         logo: {
             url: String,
             public_id: String
         },
         email: String,
         phone: String,
-        address: String
+        address: String,
+        quoteTerms: String
     },
 
 

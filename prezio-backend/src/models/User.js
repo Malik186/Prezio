@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema({
   middleName: { type: String },
   surname: { type: String },
   companyName: { type: String },
+  position: { type: String },
   phone: { type: String },
   address: { type: String },
 
@@ -39,6 +40,30 @@ const userSchema = new mongoose.Schema({
   logo: {
     url: { type: String },
     public_id: { type: String }
+  },
+
+  // Quote Terms
+  quoteTerms: {
+    type: String,
+    default: ''
+  },
+
+  // invoice terms
+  invoiceTerms: {
+    type: String,
+    default: ''
+  },
+
+  // receipt terms
+  receiptTerms: {
+    type: String,
+    default: ''
+  },
+
+  //estimates terms
+  estimateTerms: {
+    type: String,
+    default: ''
   },
 
   // last quotation number
