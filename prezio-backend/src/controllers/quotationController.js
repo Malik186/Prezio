@@ -486,3 +486,16 @@ exports.restoreQuotation = asyncHandler(async (req, res) => {
 
   res.status(200).json({ message: '♻️ Quotation restored successfully', quotation });
 });
+
+// List all quotations where validUntil date is expired
+exports.getExpiredQuotations = asyncHandler(async (req, res) => {
+  const today = new Date();
+
+  const expiredQuotations = await Quotation.find({
+    validUntil: { $lt: today },
+    isDeleted: false
+  }).populate('client', 'clientName') // optional: populate client name
+    .populate('creator', 'companyName email'); // optional: populate creator info
+
+  res.status(200).json({ count: expiredQuotations.length, quotations: expiredQuotations });
+});

@@ -10,7 +10,8 @@ const {
   restoreQuotation,
   previewQuotation,
   updateQuotationStatus,
-  sendQuotation
+  sendQuotation,
+  getExpiredQuotations
 } = require('../controllers/quotationController');
 const { createQuotationSchema } = require('../validators/quotationValidator');
 const validate = require('../middleware/validateRequest');
@@ -32,5 +33,8 @@ router.post('/:id/send', auth, sendQuotation);
 // trash management
 router.get('/trash', auth, getSoftDeletedQuotations);
 router.put('/:id/restore', auth, restoreQuotation);
+
+// Get all expired quotations
+router.get('/expired', auth, getExpiredQuotations);
 
 module.exports = router;
