@@ -18,6 +18,14 @@ const validate = require('../middleware/validateRequest');
 
 router.post('/', auth, validate(createQuotationSchema), createQuotation);
 router.get('/', auth, getQuotations);
+
+// Place specific routes BEFORE parameter routes
+// trash management
+router.get('/trash', auth, getSoftDeletedQuotations);
+// Get all expired quotations
+router.get('/expired', auth, getExpiredQuotations);
+
+// Routes with parameters come after specific routes
 router.put('/:id', auth, editQuotation);
 router.delete('/:id', auth, softDeleteQuotation);
 
@@ -30,11 +38,7 @@ router.patch('/:id/status', updateQuotationStatus);
 // Send quotation to client via email
 router.post('/:id/send', auth, sendQuotation);
 
-// trash management
-router.get('/trash', auth, getSoftDeletedQuotations);
+// Restore a soft-deleted quotation
 router.put('/:id/restore', auth, restoreQuotation);
-
-// Get all expired quotations
-router.get('/expired', auth, getExpiredQuotations);
 
 module.exports = router;
