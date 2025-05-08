@@ -11,6 +11,8 @@ const twoFactorRoutes = require('./routes/twoFactorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const quotationRoutes = require('./routes/quotationRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
@@ -54,6 +56,9 @@ app.use('/api/clients', clientRoutes);
 
 // Quotation routes
 app.use('/api/quotations', quotationRoutes);
+
+// Invoice routes
+app.use('/api/invoices', invoiceRoutes);
 
 /**
  * Admin-only Routes
