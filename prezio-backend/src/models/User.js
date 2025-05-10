@@ -78,6 +78,12 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
 
+  // Last receipt number
+  lastReceiptNumber: {
+    type: Number,
+    default: 0
+  },
+
   // Role (admin/user)
   role: {
     type: String,

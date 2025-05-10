@@ -12,6 +12,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const quotationRoutes = require('./routes/quotationRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
+const receiptRoutes = require('./routes/receiptRoutes');
 
 const adminRoutes = require('./routes/adminRoutes');
 
@@ -59,6 +60,9 @@ app.use('/api/quotations', quotationRoutes);
 
 // Invoice routes
 app.use('/api/invoices', invoiceRoutes);
+
+// Receipt routes
+app.use('/api/receipts', receiptRoutes);
 
 /**
  * Admin-only Routes
