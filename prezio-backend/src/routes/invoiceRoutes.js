@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
+const { invoiceLimiter } = require('../middleware/rateLimiter');
 const {
     getInvoices,
     getInvoiceById,
@@ -12,34 +13,39 @@ const {
     previewInvoice,
     updateInvoicePaymentStatus,
     sendInvoice,
-    getOverdueInvoices
+    getOverdueInvoices,
+    getInvoicePaymentHistory
 } = require('../controllers/invoiceController');
 const { createInvoiceSchema } = require('../validators/invoiceValidator');
 const validate = require('../middleware/validateRequest');
 
+// Apply general rate limiting to all invoice routes
+router.use(invoiceLimiter);
+
+// Basic CRUD operations
 router.post('/', auth, validate(createInvoiceSchema), createInvoice);
 router.get('/', auth, getInvoices);
 
-// IMPORTANT: Place specific routes BEFORE parameter routes
-// trash management
+// Specific routes (BEFORE parameter routes)
 router.get('/trash', auth, getSoftDeletedInvoices);
-// Get all Overdue invoices
 router.get('/overdue', auth, getOverdueInvoices);
 
-// Routes with parameters come after specific routes
+// Parameter routes
 router.get('/:id', auth, getInvoiceById);
 router.put('/:id', auth, editInvoice);
 router.delete('/:id', auth, softDeleteInvoice);
+router.get('/:id/payment-history', auth, getInvoicePaymentHistory);
 
-//preview
+// Preview route (public access with rate limiting)
 router.get('/:id/preview', previewInvoice);
 
-//update status
-router.patch('/:id/status', updateInvoicePaymentStatus);
+// Protected status update route
+router.patch('/:id/status', auth, updateInvoicePaymentStatus);
 
-// Send invoice to client via email
+// Protected email route
 router.post('/:id/send', auth, sendInvoice);
 
+// Protected restore route
 router.put('/:id/restore', auth, restoreInvoice);
 
 module.exports = router;
