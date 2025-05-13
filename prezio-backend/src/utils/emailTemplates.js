@@ -647,10 +647,194 @@ const createWelcomeEmail = (user, plainKey) => {
     `;
   };
   
+  const createInvoiceEmail = (invoice, invoiceUrl) => {
+    // Format the total amount
+    const formattedTotal = new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: invoice.currency || 'USD' 
+    }).format(invoice.total);
+
+    // Format the due date
+    const formattedDueDate = new Date(invoice.dueDate).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Invoice from ${invoice.creatorSnapshot.companyName}</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #f8f9fa;
+            border-bottom: 3px solid #0066ff;
+          }
+          .header img {
+            max-height: 60px;
+          }
+          .content {
+            padding: 30px 20px;
+            background-color: #ffffff;
+          }
+          .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            background-color: #f8f9fa;
+          }
+          h1 {
+            color: #0066ff;
+            margin-top: 0;
+          }
+          .invoice-details {
+            background-color: #f7f7f7;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+          }
+          .invoice-number {
+            font-family: monospace;
+            font-size: 20px;
+            color: #0066ff;
+            margin-bottom: 10px;
+          }
+          .due-date {
+            color: #ff3b30;
+            font-size: 14px;
+            margin-top: 10px;
+          }
+          .payment-details {
+            background-color: #f0f7ff;
+            border-left: 4px solid #0066ff;
+            padding: 15px;
+            margin: 20px 0;
+          }
+          .button {
+            display: inline-block;
+            background-color: #0066ff;
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px 0;
+          }
+          .button:hover {
+            background-color: #0055cc;
+          }
+          .text-center {
+            text-align: center;
+          }
+          .company-info {
+            margin-top: 20px;
+            font-style: italic;
+          }
+          .divider {
+            height: 1px;
+            background-color: #e1e1e1;
+            margin: 25px 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            ${invoice.creatorSnapshot.logo && invoice.creatorSnapshot.logo.url ? 
+              `<img src="${invoice.creatorSnapshot.logo.url}" alt="${invoice.creatorSnapshot.companyName} Logo">` : 
+              `<h2>${invoice.creatorSnapshot.companyName}</h2>`
+            }
+          </div>
+          <div class="content">
+            <h1>Invoice: ${invoice.invoiceName}</h1>
+            <p>Dear ${invoice.clientSnapshot.name},</p>
+            <p>Please find below your invoice details:</p>
+            
+            <div class="invoice-details">
+              <div class="invoice-number">Invoice Number: ${invoice.invoiceNumber}</div>
+              <p><strong>Amount Due:</strong> ${formattedTotal}</p>
+              <p class="due-date">Due Date: ${formattedDueDate}</p>
+            </div>
+            
+            <div class="payment-details">
+              <h3>Payment Details:</h3>
+              ${formatPaymentDetails(invoice.payment)}
+            </div>
+            
+            <div class="text-center">
+              <a href="${invoiceUrl}" class="button">View Complete Invoice</a>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p>If you have any questions about this invoice, please contact us at <a href="mailto:${invoice.creatorSnapshot.email}">${invoice.creatorSnapshot.email}</a>${invoice.creatorSnapshot.phone ? ` or by phone at ${invoice.creatorSnapshot.phone}` : ''}.</p>
+            
+            <div class="company-info">
+              <p>Best regards,</p>
+              <p><strong>${invoice.creatorSnapshot.companyName}</strong></p>
+              ${invoice.creatorSnapshot.address ? `<p>${invoice.creatorSnapshot.address}</p>` : ''}
+            </div>
+          </div>
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} ${invoice.creatorSnapshot.companyName}. All rights reserved.</p>
+            ${invoice.creatorSnapshot.address ? `<p>${invoice.creatorSnapshot.address}</p>` : ''}
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  // Helper function to format payment details
+  function formatPaymentDetails(payment) {
+    if (!payment) return '<p>Payment details not specified</p>';
+  
+    let details = `<p><strong>Payment Method:</strong> ${payment.method.toUpperCase()}</p>`;
+  
+    if (payment.method === 'mpesa') {
+      if (payment.mpesa.type === 'paybill') {
+        details += `
+          <p><strong>Paybill Number:</strong> ${payment.mpesa.paybill.tillNumber}</p>
+        `;
+      } else if (payment.mpesa.type === 'sendMoney') {
+        details += `
+          <p><strong>Phone Number:</strong> ${payment.mpesa.sendMoney.phoneNumber}</p>
+        `;
+      }
+    } else if (payment.method === 'bank') {
+      details += `
+        <p><strong>Bank Name:</strong> ${payment.bank.bankName}</p>
+        <p><strong>Account Number:</strong> ${payment.bank.accountNumber}</p>
+      `;
+    }
+  
+    return details;
+  }
+  
   module.exports = {
     createWelcomeEmail,
     createLoginAlertEmail,
     createPasswordResetEmail,
     createCronErrorEmail,
-    createQuotationEmail
+    createQuotationEmail,
+    createInvoiceEmail  // Add this line
   };
