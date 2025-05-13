@@ -8,6 +8,7 @@ const Client = require('../models/Client');
 const User = require('../models/User');
 const Template = require('../models/Template');
 const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
+const receiptController = require('./receiptController');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
 const { createInvoiceEmail } = require('../utils/emailTemplates');
 
@@ -404,41 +405,124 @@ exports.sendInvoice = asyncHandler(async (req, res) => {
 // Update Invoice Payment Status
 exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { status, amountPaid, datePaid } = req.body;
+  const { status, amountPaid, datePaid, paymentMethod, paymentDetails, notes, __v } = req.body;
 
-  // Validate input
-  if (!['pending', 'partial', 'paid', 'overdue', 'canceled'].includes(status)) {
-    return res.status(400).json({ 
-      message: '❌ Invalid status. Must be "pending", "partial", "paid", "overdue", or "canceled".' 
+  try {
+    // First find the invoice
+    const invoice = await Invoice.findOne({
+      _id: id,
+      isDeleted: { $ne: true }
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: '❌ Invoice not found'
+      });
+    }
+
+    // Version check
+    if (__v !== undefined && invoice.__v !== __v) {
+      return res.status(409).json({
+        message: `❌ Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has been modified. Please refresh and try again.`,
+        currentVersion: invoice.__v,
+        providedVersion: __v
+      });
+    }
+
+    // Validate amount paid if provided
+    if (amountPaid !== undefined) {
+      if (amountPaid < 5 || amountPaid > 500000) {
+        return res.status(400).json({
+          message: `❌ Payment amount must be between 5 and 500,000 ${invoice.currency}`
+        });
+      }
+    }
+
+    // Current payment status for validation
+    const currentStatus = invoice.payment?.status || 'pending';
+
+    // Validate status transitions
+    if (currentStatus === 'paid') {
+      return res.status(400).json({
+        message: `❌ Cannot change status of paid Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber})`
+      });
+    }
+
+    if (currentStatus === 'partial') {
+      if (!['paid', 'partial'].includes(status)) {
+        return res.status(400).json({
+          message: `❌ Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has partial payment. Status can only be changed to paid`
+        });
+      }
+    }
+
+    // Handle status updates based on payment amount
+    if (amountPaid !== undefined) {
+      // Initialize payment object if it doesn't exist
+      if (!invoice.payment) {
+        invoice.payment = {
+          method: paymentMethod || 'mpesa',
+          status: 'pending',
+          amountPaid: 0
+        };
+      }
+
+      // Set payment details
+      invoice.payment.amountPaid = amountPaid;
+
+      // Auto-determine status based on amount
+      if (amountPaid >= invoice.total) {
+        status = 'paid';
+      } else if (amountPaid >= 5) {
+        status = 'partial';
+      } else {
+        return res.status(400).json({
+          message: `❌ Payment amount must be at least 5 ${invoice.currency}`
+        });
+      }
+
+      // Track payment history
+      if (!invoice.paymentHistory) {
+        invoice.paymentHistory = [];
+      }
+
+      invoice.paymentHistory.push({
+        date: datePaid || new Date(),
+        amount: amountPaid - (invoice.payment.amountPaid || 0),
+        method: paymentMethod || invoice.payment.method,
+        paymentDetails: paymentDetails || {},
+        notes: notes || `Payment of ${amountPaid} ${invoice.currency}`,
+        createdBy: req.user._id
+      });
+    } else if (status === 'partial') {
+      // Prevent setting partial status without payment
+      return res.status(400).json({
+        message: `❌ Cannot set Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) to partial without payment`
+      });
+    }
+
+    // Synchronize invoice and payment status
+    invoice.status = status;
+    if (invoice.payment) {
+      invoice.payment.status = status;
+    }
+
+    // Increment version
+    invoice.__v = (__v || 0) + 1;
+    await invoice.save();
+
+    return res.status(200).json({
+      message: `✅ Invoice status updated to ${status} successfully`,
+      invoice
+    });
+
+  } catch (error) {
+    console.error('Error updating invoice payment status:', error);
+    res.status(500).json({
+      message: '❌ Error updating invoice payment status',
+      error: error.message
     });
   }
-
-  const invoice = await Invoice.findById(id);
-
-  if (!invoice || invoice.isDeleted) {
-    return res.status(404).json({ message: '❌ Invoice not found.' });
-  }
-
-  // Update invoice payment details
-  invoice.payment.status = status;
-  
-  if (amountPaid !== undefined) {
-    invoice.payment.amountPaid = amountPaid;
-  }
-  
-  if (datePaid) {
-    invoice.payment.datePaid = datePaid;
-  }
-  
-  // Also update main status to reflect payment status
-  invoice.status = status;
-  
-  await invoice.save();
-
-  res.status(200).json({ 
-    message: `✅ Invoice payment status updated to ${status} successfully.`, 
-    invoice 
-  });
 });
 
 // GET /api/invoices?status=&search=&page=&limit=
@@ -528,34 +612,79 @@ exports.editInvoice = asyncHandler(async (req, res) => {
   });
 
   if (!invoice) {
-    return res.status(404).json({ message: 'Invoice not found' });
+    return res.status(404).json({ message: '❌ Invoice not found' });
   }
 
-  // Update allowed fields
-  const updatableFields = ['invoiceName', 'dueDate', 'lineItems', 'discount', 'currency', 'payment', 'notes', 'projectDescription'];
-  
-  updatableFields.forEach(field => {
-    if (req.body[field] !== undefined) {
-      if (field === 'payment' && req.body.payment) {
-        // For payment, we need to validate the structure
-        if (validatePaymentDetails(req.body.payment)) {
+  // Prevent editing paid invoices
+  if (invoice.payment?.status === 'paid') {
+    return res.status(400).json({
+      message: '❌ Paid invoices cannot be modified'
+    });
+  }
+
+  // For partial payments, only allow adding new line items
+  if (invoice.payment?.status === 'partial') {
+    // Only allow adding new line items
+    if (req.body.lineItems) {
+      const existingItemIds = invoice.lineItems.map(item => item._id.toString());
+      const newLineItems = req.body.lineItems.filter(item => !item._id);
+      
+      // Ensure existing items haven't been modified
+      const existingItemsUnchanged = req.body.lineItems
+        .filter(item => item._id)
+        .every(item => {
+          const originalItem = invoice.lineItems.find(i => i._id.toString() === item._id);
+          return originalItem &&
+                 originalItem.quantity === item.quantity &&
+                 originalItem.unitPrice === item.unitPrice &&
+                 originalItem.description === item.description;
+        });
+
+      if (!existingItemsUnchanged) {
+        return res.status(400).json({
+          message: '❌ Cannot modify existing line items for partially paid invoices'
+        });
+      }
+
+      // Add only new items
+      invoice.lineItems = [...invoice.lineItems, ...newLineItems];
+    }
+
+    // Prevent modifying other fields
+    const allowedFieldsForPartial = ['lineItems'];
+    const attemptedFields = Object.keys(req.body).filter(field => !allowedFieldsForPartial.includes(field));
+
+    if (attemptedFields.length > 0) {
+      return res.status(400).json({
+        message: '❌ Only new line items can be added to partially paid invoices',
+        attemptedFields
+      });
+    }
+  } else {
+    // For other statuses, allow normal editing
+    const updatableFields = ['invoiceName', 'dueDate', 'lineItems', 'discount', 'currency', 'payment', 'notes', 'projectDescription'];
+    
+    updatableFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        if (field === 'payment' && req.body.payment) {
+          if (validatePaymentDetails(req.body.payment)) {
+            invoice[field] = req.body[field];
+          }
+        } else {
           invoice[field] = req.body[field];
         }
-      } else {
-        invoice[field] = req.body[field];
       }
-    }
-  });
+    });
+  }
 
-  // Recalculate totals if line items or discount changed
-  if (req.body.lineItems || req.body.discount !== undefined) {
+  // Recalculate totals if new items were added
+  if (req.body.lineItems) {
     let subtotal = 0;
     let tax = 0;
 
     invoice.lineItems.forEach(item => {
       const lineTotal = item.quantity * item.unitPrice;
       subtotal += lineTotal;
-      // Always apply VAT tax (16%)
       tax += lineTotal * 0.16;
     });
 
@@ -565,7 +694,11 @@ exports.editInvoice = asyncHandler(async (req, res) => {
   }
 
   await invoice.save();
-  res.status(200).json({ message: '✅ Invoice updated successfully', invoice });
+  
+  res.status(200).json({ 
+    message: '✅ Invoice updated successfully', 
+    invoice 
+  });
 });
 
 // DELETE /api/invoices/:id
@@ -719,5 +852,83 @@ exports.createInvoiceFromQuotation = asyncHandler(async (req, res) => {
   res.status(201).json({ 
     message: '✅ Invoice created successfully from quotation', 
     invoice 
+  });
+});
+
+// Check and update status of overdue invoices
+exports.checkOverdueInvoices = asyncHandler(async (req, res) => {
+  const currentDate = new Date();
+  
+  // Find all invoices that are past due date but not marked as overdue, paid, or canceled
+  const overdueInvoices = await Invoice.find({
+    dueDate: { $lt: currentDate },
+    status: { $in: ['pending', 'partial', 'sent', 'viewed'] },
+    isDeleted: { $ne: true }
+  });
+  
+  if (overdueInvoices.length === 0) {
+    return res.status(200).json({ 
+      message: 'No new overdue invoices found.',
+      checked: true
+    });
+  }
+  
+  // Update all found invoices to overdue status
+  const updatedInvoices = [];
+  
+  for (const invoice of overdueInvoices) {
+    invoice.status = 'overdue';
+    if (invoice.payment) {
+      invoice.payment.status = 'overdue';
+    }
+
+    updatedInvoices.push(await invoice.save());
+  }
+  
+  res.status(200).json({ 
+    message: `✅ ${updatedInvoices.length} invoices marked as overdue successfully`, 
+    invoices: updatedInvoices 
+  });
+});
+
+// GET /api/invoices/:id/payment-history
+exports.getInvoicePaymentHistory = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user._id;
+
+  const invoice = await Invoice.findOne({
+    _id: id,
+    creator: userId,
+    isDeleted: { $ne: true }
+  });
+
+  if (!invoice) {
+    return res.status(404).json({ 
+      message: '❌ Invoice not found' 
+    });
+  }
+
+  // Return empty array if no payment history exists
+  if (!invoice.paymentHistory || invoice.paymentHistory.length === 0) {
+    return res.status(200).json({
+      message: 'No payment history found',
+      paymentHistory: [],
+      currentStatus: invoice.payment?.status || 'pending',
+      amountPaid: invoice.payment?.amountPaid || 0,
+      total: invoice.total
+    });
+  }
+
+  // Sort payment history by date in descending order (newest first)
+  const sortedHistory = invoice.paymentHistory.sort((a, b) => 
+    new Date(b.date) - new Date(a.date)
+  );
+
+  res.status(200).json({
+    message: '✅ Payment history retrieved successfully',
+    paymentHistory: sortedHistory,
+    currentStatus: invoice.payment?.status || 'pending',
+    amountPaid: invoice.payment?.amountPaid || 0,
+    total: invoice.total
   });
 });

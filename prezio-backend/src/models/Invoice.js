@@ -61,12 +61,44 @@ const paymentDetailsSchema = new mongoose.Schema({
     bank: bankSchema,
     status: {
         type: String,
-        enum: ['pending', 'partial', 'paid', 'overdue', 'canceled'],
+        enum: ['pending', 'partial', 'paid', 'overdue', 'canceled', 'sent', 'draft'],
         default: 'pending'
     },
     datePaid: Date,
     amountPaid: { type: Number, default: 0 }
 }, { _id: false });
+
+// Payment history tracking schema
+const paymentHistorySchema = new mongoose.Schema({
+  date: { 
+    type: Date, 
+    default: Date.now, 
+    required: true 
+  },
+  amount: { 
+    type: Number, 
+    required: true 
+  },
+  method: { 
+    type: String, 
+    enum: ['mpesa', 'bank'], 
+    required: true 
+  },
+  paymentDetails: {
+    // For mpesa
+    transactionId: String,
+    phoneNumber: String,
+    // For bank
+    bankName: String,
+    accountNumber: String,
+    transactionReference: String
+  },
+  notes: String,
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
+}, { timestamps: true });
 
 const invoiceSchema = new mongoose.Schema({
     // Basic Fields
@@ -144,6 +176,8 @@ const invoiceSchema = new mongoose.Schema({
 
     // Payment details
     payment: paymentDetailsSchema,
+
+    paymentHistory: [paymentHistorySchema], // Array of payment history records
 
     lineItems: {
         type: [lineItemSchema],

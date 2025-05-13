@@ -8,8 +8,12 @@ const Client = require('../models/Client');
 const User = require('../models/User');
 const Template = require('../models/Template');
 const generateQuoteNumber = require('../utils/generateQuoteNumber');
+const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const sendQuotationEmail = require('../utils/sendQuotationEmail');
+const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
+const Invoice = require('../models/Invoice');
 const { createQuotationEmail } = require('../utils/emailTemplates');
+const { createInvoiceEmail } = require('../utils/emailTemplates');
 
 exports.createQuotation = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -343,7 +347,7 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: '❌ Invalid status. Must be "accepted" or "rejected".' });
   }
 
-  const quotation = await Quotation.findById(id);
+  const quotation = await Quotation.findById(id).populate('creator client');
 
   if (!quotation || quotation.isDeleted) {
     return res.status(404).json({ message: '❌ Quotation not found.' });
@@ -356,6 +360,109 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
 
   quotation.status = status;
   await quotation.save();
+
+  // If quotation is accepted, generate an invoice automatically
+  if (status === 'accepted') {
+    try {
+      // Create a due date 7 days from now (adjustable as needed)
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+      
+      //  TODO Create default payment details (this will need to be adjusted based on a user)
+      const defaultPayment = {
+        method: 'mpesa', // Default payment method
+        mpesa: {
+          type: 'paybill',
+          paybill: {
+            tillNumber: quotation.creator.defaultTillNumber || '123456' // Use creator's default tillNumber or a placeholder
+          }
+        },
+        status: 'pending'
+      };
+      
+      // Update lineItems structure for invoice
+      // Remove applyTax property as it's not needed in invoice model
+      const invoiceLineItems = quotation.lineItems.map(item => {
+        const { applyTax, ...restItem } = item.toObject ? item.toObject() : item;
+        return restItem;
+      });
+
+      // Calculate subtotal and tax for invoice (tax is applied to all items)
+      let subtotal = 0;
+      let tax = 0;
+
+      invoiceLineItems.forEach(item => {
+        const lineTotal = item.quantity * item.unitPrice;
+        subtotal += lineTotal;
+        tax += lineTotal * 0.16; // Always apply 16% tax
+      });
+
+      const total = subtotal + tax - (quotation.discount || 0);
+
+      // Generate invoice number
+      const user = quotation.creator;
+      const nextNumber = (user.lastInvoiceNumber || 0) + 1;
+      const invoiceNumber = generateInvoiceNumber(nextNumber);
+      user.lastInvoiceNumber = nextNumber;
+      await user.save();
+
+      // Create the invoice
+      const invoice = await Invoice.create({
+        invoiceNumber,
+        invoiceName: quotation.quoteName, // Use quotation name
+        projectDescription: quotation.projectDescription,
+        notes: quotation.notes,
+        dueDate,
+        client: quotation.client._id,
+        creator: user._id,
+        currency: quotation.currency,
+        lineItems: invoiceLineItems,
+        subtotal,
+        tax,
+        total,
+        discount: quotation.discount || 0,
+        status: 'draft',
+        template: quotation.template, // Use the same template
+        payment: defaultPayment,
+        quotation: quotation._id, // Link to quotation
+        clientSnapshot: quotation.clientSnapshot,
+        creatorSnapshot: {
+          ...quotation.creatorSnapshot,
+          invoiceTerms: user.invoiceTerms || '' // Use invoiceTerms instead of quoteTerms
+        }
+      });
+
+      // Send the invoice to client's email
+      const frontendBaseUrl = process.env.FRONTEND_URL || 'https://prezio.com';
+      const invoiceUrl = `${frontendBaseUrl}/invoices/view/${invoice._id}`;
+
+      // Create email subject with invoice name and company
+      const emailSubject = `Invoice: ${invoice.invoiceName} from ${invoice.creatorSnapshot.companyName}`;
+
+      await sendInvoiceEmail({
+        to: quotation.clientSnapshot.contactEmail,
+        subject: emailSubject,
+        html: createInvoiceEmail(invoice, invoiceUrl) //  TODO implement this function similar to createQuotationEmail
+      });
+
+      // Update invoice status to 'sent'
+      invoice.status = 'sent';
+      await invoice.save();
+
+      return res.status(200).json({ 
+        message: `✅ Quotation ${status} successfully. Invoice created and sent.`, 
+        quotation,
+        invoice 
+      });
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      // Still update quotation status even if invoice creation fails
+      return res.status(200).json({ 
+        message: `✅ Quotation ${status} successfully, but automatic invoice creation failed: ${error.message}`,
+        quotation
+      });
+    }
+  }
 
   res.status(200).json({ message: `✅ Quotation ${status} successfully.`, quotation });
 });
