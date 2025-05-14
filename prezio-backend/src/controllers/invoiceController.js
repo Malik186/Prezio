@@ -11,6 +11,7 @@ const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const receiptController = require('./receiptController');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
 const { createInvoiceEmail } = require('../utils/emailTemplates');
+const { recordPaymentHistory } = require('../utils/paymentHistoryManager');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -120,10 +121,10 @@ exports.createInvoice = asyncHandler(async (req, res) => {
 // Validate payment details helper function
 function validatePaymentDetails(payment) {
   if (!payment || !payment.method) return false;
-  
+
   if (payment.method === 'mpesa') {
     if (!payment.mpesa || !payment.mpesa.type) return false;
-    
+
     if (payment.mpesa.type === 'paybill') {
       return payment.mpesa.paybill && payment.mpesa.paybill.tillNumber;
     } else if (payment.mpesa.type === 'sendMoney') {
@@ -133,7 +134,7 @@ function validatePaymentDetails(payment) {
   } else if (payment.method === 'bank') {
     return payment.bank && payment.bank.bankName && payment.bank.accountNumber;
   }
-  
+
   return false;
 }
 
@@ -323,10 +324,10 @@ function getFormattedPaymentDetails(payment) {
   if (!payment) return { method: 'Not specified' };
 
   const result = { method: payment.method };
-  
+
   if (payment.method === 'mpesa') {
     result.type = payment.mpesa.type;
-    
+
     if (payment.mpesa.type === 'paybill') {
       result.details = `Till Number: ${payment.mpesa.paybill.tillNumber}`;
     } else if (payment.mpesa.type === 'sendMoney') {
@@ -335,13 +336,13 @@ function getFormattedPaymentDetails(payment) {
   } else if (payment.method === 'bank') {
     result.details = `Bank: ${payment.bank.bankName}, Account: ${payment.bank.accountNumber}`;
   }
-  
+
   result.status = payment.status;
-  
+
   if (payment.datePaid) {
     result.datePaid = new Date(payment.datePaid).toLocaleDateString();
   }
-  
+
   return result;
 }
 
@@ -404,6 +405,13 @@ exports.sendInvoice = asyncHandler(async (req, res) => {
 
 // Update Invoice Payment Status
 exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
+
+  if (!['pending', 'partial', 'paid', 'overdue', 'canceled', 'sent', 'draft'].includes(status)) {
+    return res.status(400).json({
+      message: '❌ Invalid status. Must be "pending", "partial", "paid", "overdue", "canceled", "sent" or "draft".'
+    });
+  }
+
   const { id } = req.params;
   const { status, amountPaid, datePaid, paymentMethod, paymentDetails, notes, __v } = req.body;
 
@@ -467,8 +475,20 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
         };
       }
 
+      // Record payment history
+      await recordPaymentHistory(invoice, {
+        amountPaid,
+        previousAmount: invoice.payment?.amountPaid || 0,
+        paymentMethod: paymentMethod || invoice.payment.method,
+        paymentDetails,
+        notes,
+        datePaid,
+        userId: req.user._id
+      });
+
       // Set payment details
       invoice.payment.amountPaid = amountPaid;
+      invoice.payment.method = paymentMethod || invoice.payment.method;
 
       // Auto-determine status based on amount
       if (amountPaid >= invoice.total) {
@@ -481,19 +501,6 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
         });
       }
 
-      // Track payment history
-      if (!invoice.paymentHistory) {
-        invoice.paymentHistory = [];
-      }
-
-      invoice.paymentHistory.push({
-        date: datePaid || new Date(),
-        amount: amountPaid - (invoice.payment.amountPaid || 0),
-        method: paymentMethod || invoice.payment.method,
-        paymentDetails: paymentDetails || {},
-        notes: notes || `Payment of ${amountPaid} ${invoice.currency}`,
-        createdBy: req.user._id
-      });
     } else if (status === 'partial') {
       // Prevent setting partial status without payment
       return res.status(400).json({
@@ -628,16 +635,16 @@ exports.editInvoice = asyncHandler(async (req, res) => {
     if (req.body.lineItems) {
       const existingItemIds = invoice.lineItems.map(item => item._id.toString());
       const newLineItems = req.body.lineItems.filter(item => !item._id);
-      
+
       // Ensure existing items haven't been modified
       const existingItemsUnchanged = req.body.lineItems
         .filter(item => item._id)
         .every(item => {
           const originalItem = invoice.lineItems.find(i => i._id.toString() === item._id);
           return originalItem &&
-                 originalItem.quantity === item.quantity &&
-                 originalItem.unitPrice === item.unitPrice &&
-                 originalItem.description === item.description;
+            originalItem.quantity === item.quantity &&
+            originalItem.unitPrice === item.unitPrice &&
+            originalItem.description === item.description;
         });
 
       if (!existingItemsUnchanged) {
@@ -663,7 +670,7 @@ exports.editInvoice = asyncHandler(async (req, res) => {
   } else {
     // For other statuses, allow normal editing
     const updatableFields = ['invoiceName', 'dueDate', 'lineItems', 'discount', 'currency', 'payment', 'notes', 'projectDescription'];
-    
+
     updatableFields.forEach(field => {
       if (req.body[field] !== undefined) {
         if (field === 'payment' && req.body.payment) {
@@ -694,10 +701,10 @@ exports.editInvoice = asyncHandler(async (req, res) => {
   }
 
   await invoice.save();
-  
-  res.status(200).json({ 
-    message: '✅ Invoice updated successfully', 
-    invoice 
+
+  res.status(200).json({
+    message: '✅ Invoice updated successfully',
+    invoice
   });
 });
 
@@ -849,33 +856,33 @@ exports.createInvoiceFromQuotation = asyncHandler(async (req, res) => {
 
   const invoice = await Invoice.create(invoiceData);
 
-  res.status(201).json({ 
-    message: '✅ Invoice created successfully from quotation', 
-    invoice 
+  res.status(201).json({
+    message: '✅ Invoice created successfully from quotation',
+    invoice
   });
 });
 
 // Check and update status of overdue invoices
 exports.checkOverdueInvoices = asyncHandler(async (req, res) => {
   const currentDate = new Date();
-  
+
   // Find all invoices that are past due date but not marked as overdue, paid, or canceled
   const overdueInvoices = await Invoice.find({
     dueDate: { $lt: currentDate },
     status: { $in: ['pending', 'partial', 'sent', 'viewed'] },
     isDeleted: { $ne: true }
   });
-  
+
   if (overdueInvoices.length === 0) {
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: 'No new overdue invoices found.',
       checked: true
     });
   }
-  
+
   // Update all found invoices to overdue status
   const updatedInvoices = [];
-  
+
   for (const invoice of overdueInvoices) {
     invoice.status = 'overdue';
     if (invoice.payment) {
@@ -884,10 +891,10 @@ exports.checkOverdueInvoices = asyncHandler(async (req, res) => {
 
     updatedInvoices.push(await invoice.save());
   }
-  
-  res.status(200).json({ 
-    message: `✅ ${updatedInvoices.length} invoices marked as overdue successfully`, 
-    invoices: updatedInvoices 
+
+  res.status(200).json({
+    message: `✅ ${updatedInvoices.length} invoices marked as overdue successfully`,
+    invoices: updatedInvoices
   });
 });
 
@@ -903,8 +910,8 @@ exports.getInvoicePaymentHistory = asyncHandler(async (req, res) => {
   });
 
   if (!invoice) {
-    return res.status(404).json({ 
-      message: '❌ Invoice not found' 
+    return res.status(404).json({
+      message: '❌ Invoice not found'
     });
   }
 
@@ -920,7 +927,7 @@ exports.getInvoicePaymentHistory = asyncHandler(async (req, res) => {
   }
 
   // Sort payment history by date in descending order (newest first)
-  const sortedHistory = invoice.paymentHistory.sort((a, b) => 
+  const sortedHistory = invoice.paymentHistory.sort((a, b) =>
     new Date(b.date) - new Date(a.date)
   );
 

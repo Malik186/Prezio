@@ -12,6 +12,7 @@ const validatePayload = require('../utils/validatePayload');
 const generateReceiptNumber = require('../utils/generateReceiptNumber');
 const sendReceiptEmail = require('../utils/sendReceiptEmail');
 const { createReceiptEmail } = require('../utils/emailTemplates');
+const { recordPaymentHistory } = require('../utils/paymentHistoryManager');
 
 /**
  * Create a receipt - can be linked to an invoice or standalone
@@ -149,6 +150,17 @@ exports.createReceipt = asyncHandler(async (req, res) => {
             balanceDue: invoice.total - payment.amountPaid - (invoice.payment.amountPaid || 0)
         };
 
+        // Record payment history for invoice
+        await recordPaymentHistory(invoice, {
+            amountPaid: payment.amountPaid,
+            previousAmount: invoice.payment?.amountPaid || 0,
+            paymentMethod: payment.method,
+            paymentDetails: payment,
+            notes: `Receipt ${receiptNumber} - ${payment.amountPaid} ${currency}`,
+            datePaid: new Date(),
+            userId: req.user._id
+        });
+
         const totalPaid = (invoice.payment.amountPaid || 0) + payment.amountPaid;
         if (totalPaid >= invoice.total) {
             invoice.payment.status = 'paid';
@@ -185,13 +197,13 @@ exports.createReceipt = asyncHandler(async (req, res) => {
                 { $inc: { lastReceiptNumber: 1 } },
                 { new: true }
             );
-            
+
             // Generate a new receipt number
             receiptData.receiptNumber = generateReceiptNumber(retryUser.lastReceiptNumber);
-            
+
             // Try creating the receipt again
             const receipt = await Receipt.create(receiptData);
-            
+
             const frontendBaseUrl = process.env.FRONTEND_URL || 'https://yourapp.com';
             const viewUrl = `${frontendBaseUrl}/receipts/view/${receipt._id}`;
             const qrCodeUrl = await generateQRCode(viewUrl);
