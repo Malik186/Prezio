@@ -421,18 +421,10 @@ exports.sendInvoice = asyncHandler(async (req, res) => {
 
 // Update Invoice Payment Status
 exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
-
-  if (!['pending', 'partial', 'paid', 'overdue', 'canceled', 'sent', 'draft'].includes(status)) {
-    return res.status(400).json({
-      message: '❌ Invalid status. Must be "pending", "partial", "paid", "overdue", "canceled", "sent" or "draft".'
-    });
-  }
-
   const { id } = req.params;
   const { status, amountPaid, datePaid, paymentMethod, paymentDetails, notes, __v } = req.body;
 
   try {
-    // First find the invoice
     const invoice = await Invoice.findOne({
       _id: id,
       isDeleted: { $ne: true }
@@ -453,35 +445,44 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
       });
     }
 
-    // Validate amount paid if provided
+    const currentStatus = invoice.payment?.status || 'pending';
+
+    // Only allow manual status change to 'canceled' for 'sent' and 'draft' statuses
+    if (status === 'canceled') {
+      if (!['sent', 'draft', 'pending'].includes(currentStatus)) {
+        return res.status(400).json({
+          message: `❌ Cannot cancel Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}). Only invoices with 'sent' or 'draft' status can be cancelled.`
+        });
+      }
+      // Update both invoice and payment status
+      invoice.status = 'canceled';
+      if (invoice.payment) {
+        invoice.payment.status = 'canceled';
+      }
+      invoice.__v = (__v || 0) + 1;
+      await invoice.save();
+      return res.status(200).json({
+        message: `✅ Invoice cancelled successfully`,
+        invoice
+      });
+    }
+
+    // If trying to change status manually (without payment)
+    if (!amountPaid) {
+      return res.status(400).json({
+        message: `❌ Status can only be changed through payment or cancellation`
+      });
+    }
+
+    // Handle payment updates
     if (amountPaid !== undefined) {
+      // Validate payment amount
       if (amountPaid < 5 || amountPaid > 500000) {
         return res.status(400).json({
           message: `❌ Payment amount must be between 5 and 500,000 ${invoice.currency}`
         });
       }
-    }
 
-    // Current payment status for validation
-    const currentStatus = invoice.payment?.status || 'pending';
-
-    // Validate status transitions
-    if (currentStatus === 'paid') {
-      return res.status(400).json({
-        message: `❌ Cannot change status of paid Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber})`
-      });
-    }
-
-    if (currentStatus === 'partial') {
-      if (!['paid', 'partial'].includes(status)) {
-        return res.status(400).json({
-          message: `❌ Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has partial payment. Status can only be changed to paid`
-        });
-      }
-    }
-
-    // Handle status updates based on payment amount
-    if (amountPaid !== undefined) {
       // Initialize payment object if it doesn't exist
       if (!invoice.payment) {
         invoice.payment = {
@@ -489,6 +490,22 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
           status: 'pending',
           amountPaid: 0
         };
+      }
+
+      // Calculate total amount paid including current payment
+      const totalPaidAmount = (invoice.payment.amountPaid || 0) + amountPaid;
+
+      // Auto-determine status based on total amount paid
+      if (totalPaidAmount >= invoice.total) {
+        invoice.status = 'paid';
+        invoice.payment.status = 'paid';
+      } else if (totalPaidAmount >= 5) {
+        invoice.status = 'partial';
+        invoice.payment.status = 'partial';
+      } else {
+        return res.status(400).json({
+          message: `❌ Payment amount must be at least 5 ${invoice.currency}`
+        });
       }
 
       // Record payment history
@@ -502,40 +519,17 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
         userId: req.user._id
       });
 
-      // Set payment details
-      invoice.payment.amountPaid = amountPaid;
+      // Update payment details
+      invoice.payment.amountPaid = totalPaidAmount;
       invoice.payment.method = paymentMethod || invoice.payment.method;
-
-      // Auto-determine status based on amount
-      if (amountPaid >= invoice.total) {
-        status = 'paid';
-      } else if (amountPaid >= 5) {
-        status = 'partial';
-      } else {
-        return res.status(400).json({
-          message: `❌ Payment amount must be at least 5 ${invoice.currency}`
-        });
-      }
-
-    } else if (status === 'partial') {
-      // Prevent setting partial status without payment
-      return res.status(400).json({
-        message: `❌ Cannot set Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) to partial without payment`
-      });
     }
 
-    // Synchronize invoice and payment status
-    invoice.status = status;
-    if (invoice.payment) {
-      invoice.payment.status = status;
-    }
-
-    // Increment version
+    // Increment version and save
     invoice.__v = (__v || 0) + 1;
     await invoice.save();
 
     return res.status(200).json({
-      message: `✅ Invoice status updated to ${status} successfully`,
+      message: `✅ Payment recorded successfully`,
       invoice
     });
 

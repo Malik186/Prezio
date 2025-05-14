@@ -150,18 +150,22 @@ exports.previewQuotation = asyncHandler(async (req, res) => {
 
     if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
 
-    // Using the same path resolution approach as in templateController
-    const templatePath = path.resolve(process.cwd(), 'src', 'templates', quotation.template.fileName);
-
-    // Check if template file exists
-    if (!fs.existsSync(templatePath)) {
+    // Fetch template from Cloudinary
+    if (!quotation.template.fileUrl) {
       return res.status(404).json({
-        message: 'Template file not found',
-        path: templatePath
+        message: 'Template URL not found'
       });
     }
 
-    const templateHtml = fs.readFileSync(templatePath, 'utf-8');
+    let templateHtml;
+    try {
+      templateHtml = await getTemplateFromCloudinary(quotation.template.fileUrl);
+    } catch (error) {
+      return res.status(404).json({
+        message: 'Error fetching template',
+        error: error.message
+      });
+    }
 
     // Configure Handlebars with allowProtoProperties to address the warning
     const compiled = Handlebars.compile(templateHtml);
