@@ -6,11 +6,20 @@ exports.uploadTemplate = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
 
   if (!req.files || !req.files.templateFile) {
-    return res.status(400).json({ message: 'Template file is required' });
+    return res.status(400).json({ 
+      message: '❌ Template file is required' 
+    });
   }
 
   try {
     const templateFile = req.files.templateFile;
+
+    // Validate file type
+    if (!templateFile.mimetype.includes('html')) {
+      return res.status(400).json({ 
+        message: '❌ Only HTML files are allowed' 
+      });
+    }
 
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(templateFile.tempFilePath, {
@@ -29,14 +38,22 @@ exports.uploadTemplate = asyncHandler(async (req, res) => {
       type: req.body.type || 'quote'
     });
 
+    // Clean up temp file
+    require('fs').unlinkSync(templateFile.tempFilePath);
+
     res.status(201).json({
       message: '✅ Template uploaded successfully',
       template: newTemplate
     });
   } catch (error) {
+    // Clean up temp file if it exists
+    if (req.files?.templateFile?.tempFilePath) {
+      require('fs').unlinkSync(req.files.templateFile.tempFilePath);
+    }
+
     console.error('Template upload error:', error);
     res.status(500).json({
-      message: 'Error uploading template',
+      message: '❌ Error uploading template',
       error: error.message
     });
   }

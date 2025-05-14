@@ -1,6 +1,7 @@
-// config/cloudinary.js
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const express = require('express');
+const fileUpload = require('express-fileupload');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,23 +9,15 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'prezio-logos',
-    allowed_formats: ['jpg', 'jpeg', 'png'],
-    transformation: [{ width: 500, height: 500, crop: 'limit' }],
-  },
+// Configure express-fileupload
+const fileUploadMiddleware = fileUpload({
+  useTempFiles: true,
+  tempFileDir: './temp/',
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  abortOnLimit: true
 });
 
-// Template storage configuration
-const templateStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'prezio-templates',
-    allowed_formats: ['html'],
-    resource_type: 'raw'
-  },
-});
-
-module.exports = { cloudinary, storage, templateStorage };
+module.exports = { 
+  cloudinary, 
+  fileUploadMiddleware 
+};
