@@ -32,6 +32,11 @@ exports.createReceipt = asyncHandler(async (req, res) => {
         paymentPurpose
     } = req.body;
 
+    // Check if payment status is canceled, if so, return early
+    if (payment && payment.status === 'canceled') {
+        return res.status(400).json({ message: 'Cannot generate receipt for canceled Invoice' });
+    }
+
     // Declare the invoice variable at this scope level
     let invoice;
 
