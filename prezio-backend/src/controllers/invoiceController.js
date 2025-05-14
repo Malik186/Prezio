@@ -1,6 +1,4 @@
 const asyncHandler = require('express-async-handler');
-const fs = require('fs');
-const path = require('path');
 const Handlebars = require('handlebars');
 const QRCode = require('qrcode');
 const Invoice = require('../models/Invoice');
@@ -175,6 +173,20 @@ const generateQRCode = async (url) => {
   }
 };
 
+// Fetch template url
+async function getTemplateFromCloudinary(templateUrl) {
+  try {
+    const response = await fetch(templateUrl);
+    if (!response.ok) {
+      throw new Error('Failed to fetch template');
+    }
+    return await response.text();
+  } catch (error) {
+    console.error('Error fetching template:', error);
+    throw error;
+  }
+}
+
 // Updated preview controller for optimized client-side PDF generation with pagination
 exports.previewInvoice = asyncHandler(async (req, res) => {
   try {
@@ -185,18 +197,22 @@ exports.previewInvoice = asyncHandler(async (req, res) => {
 
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
-    // Using the same path resolution approach as in templateController
-    const templatePath = path.resolve(process.cwd(), 'src', 'templates', invoice.template.fileName);
-
-    // Check if template file exists
-    if (!fs.existsSync(templatePath)) {
+    // Fetch template from Cloudinary
+    if (!invoice.template.fileUrl) {
       return res.status(404).json({
-        message: 'Template file not found',
-        path: templatePath
+        message: 'Template URL not found'
       });
     }
 
-    const templateHtml = fs.readFileSync(templatePath, 'utf-8');
+    let templateHtml;
+    try {
+      templateHtml = await getTemplateFromCloudinary(invoice.template.fileUrl);
+    } catch (error) {
+      return res.status(404).json({
+        message: 'Error fetching template',
+        error: error.message
+      });
+    }
 
     // Configure Handlebars with allowProtoProperties to address the warning
     const compiled = Handlebars.compile(templateHtml);

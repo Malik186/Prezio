@@ -17,4 +17,14 @@ const storage = new CloudinaryStorage({
   },
 });
 
-module.exports = { cloudinary, storage };
+// Template storage configuration
+const templateStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'prezio-templates',
+    allowed_formats: ['html'],
+    resource_type: 'raw'
+  },
+});
+
+module.exports = { cloudinary, storage, templateStorage };
