@@ -6,34 +6,64 @@ const { sendNotification } = require('../services/notificationService');
 // @desc    Create a new client
 // @route   POST /api/clients
 // @access  Private
-//TODO  Include a Validator here
-exports.createClient = async (req, res) => {
-    const { clientName, clientAddress, contactPersonName, contactPersonPhone, contactPersonEmail } = req.body;
-  
-    if (!clientName || !clientAddress || !contactPersonName || !contactPersonPhone || !contactPersonEmail) {
-      return res.status(400).json({ message: 'Please provide all required fields.' });
+exports.createClient = asyncHandler(async (req, res) => {
+  try {
+    // Validate request body against schema
+    const { error, value } = clientValidationSchema.validate(req.body, {
+      abortEarly: false // Return all errors, not just the first one
+    });
+
+    if (error) {
+      return res.status(400).json({
+        message: '❌ Validation failed',
+        errors: error.details.map(detail => ({
+          field: detail.context.key,
+          message: detail.message
+        }))
+      });
     }
-  
+
+    // Check if client with same email already exists
+    const existingClient = await Client.findOne({
+      user: req.user._id,
+      contactPersonEmail: value.contactPersonEmail,
+      isDeleted: false
+    });
+
+    if (existingClient) {
+      return res.status(400).json({
+        message: '❌ A client with this email already exists'
+      });
+    }
+
+    // Create new client using validated data
     const client = new Client({
       user: req.user._id,
-      clientName,
-      clientAddress,
-      contactPersonName,
-      contactPersonPhone,
-      contactPersonEmail
+      ...value
     });
-  
+
     await client.save();
 
     // Send notification to user about new client creation
     await sendNotification({
       userId: req.user._id,
       title: 'New Client Created',
-      body: `You have successfully created a new client: ${clientName}.`,
+      body: `You have successfully created a new client: ${value.clientName}.`,
       type: 'success'
     });
-    res.status(201).json(client);
-  };
+
+    res.status(201).json({
+      message: '✅ Client created successfully',
+      client
+    });
+  } catch (error) {
+    console.error('Error creating client:', error);
+    res.status(500).json({
+      message: '❌ Error creating client',
+      error: error.message
+    });
+  }
+});
 
 // @desc    Get all clients for logged-in user
 // @route   GET /api/clients
