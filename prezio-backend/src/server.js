@@ -5,6 +5,8 @@ const startAccountCleanupJob = require('./jobs/accountCleanup');
 const startNotificationCleanupJob = require('./jobs/notificationCleanup');
 const startClientCleanupJob = require('./jobs/clientCleanup');
 const startQuotationCleanupJob = require('./jobs/quotationCleanup');
+const startInvoiceCleanupJob = require('./jobs/invoiceCleanup');
+const startReceiptCleanupJob = require('./jobs/receiptCleanup');
 
 connectDB();
 
@@ -12,6 +14,9 @@ startAccountCleanupJob();        // 7-day account deletion job
 startNotificationCleanupJob();   // 24hr notification cleanup job
 startClientCleanupJob();        // 30-day client cleanup job
 startQuotationCleanupJob();     // 30-day quotation cleanup job
+startInvoiceCleanupJob();      // 30-day invoice cleanup job
+startReceiptCleanupJob();      // 30-day receipt cleanup job
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
