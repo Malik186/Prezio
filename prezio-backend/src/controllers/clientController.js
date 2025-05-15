@@ -24,6 +24,14 @@ exports.createClient = async (req, res) => {
     });
   
     await client.save();
+
+    // Send notification to user about new client creation
+    await sendNotification({
+      userId: req.user._id,
+      title: 'New Client Created',
+      body: `You have successfully created a new client: ${clientName}.`,
+      type: 'success'
+    });
     res.status(201).json(client);
   };
 
@@ -125,6 +133,13 @@ exports.deleteClient = asyncHandler(async (req, res) => {
     client.isDeleted = true;
     client.deletedAt = new Date();
     await client.save();
+    // Send notification to user about client deletion
+    await sendNotification({
+        userId: req.user._id,
+        title: 'Client Deleted',
+        body: `You have successfully deleted the client: ${client.clientName}.`,
+        type: 'success'
+    });
   
     res.status(200).json({ message: '✅ Client deleted successfully' });
   });

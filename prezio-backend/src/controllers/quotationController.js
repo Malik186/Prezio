@@ -12,6 +12,7 @@ const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const sendQuotationEmail = require('../utils/sendQuotationEmail');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
 const Invoice = require('../models/Invoice');
+const { sendNotification } = require('../services/notificationService');
 const { createQuotationEmail } = require('../utils/emailTemplates');
 const { createInvoiceEmail } = require('../utils/emailTemplates');
 
@@ -50,6 +51,14 @@ exports.createQuotation = asyncHandler(async (req, res) => {
   const quoteNumber = generateQuoteNumber(nextNumber);
   user.lastQuoteNumber = nextNumber;
   await user.save();
+
+  // Notification of successful creation
+  await sendNotification({
+    userId: user._id,
+    title: 'Quotation Created',
+    body: `Quotation ${quoteName} has been created successfully.`,
+    type: 'success'
+  });
 
   let subtotal = 0;
   let tax = 0;
@@ -320,6 +329,14 @@ exports.sendQuotation = asyncHandler(async (req, res) => {
       html: createQuotationEmail(quotation, quotationUrl)
     });
 
+    // Notification of successful sending
+    await sendNotification({
+      userId: req.user._id,
+      title: 'Quotation Sent',
+      body: `Quotation ${quotation.quoteName} has been sent successfully to ${clientEmail}.`,
+      type: 'success'
+    });
+
     // Update quotation status to 'sent' if it was in 'draft'
     if (quotation.status === 'draft') {
       quotation.status = 'sent';
@@ -364,6 +381,14 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
 
   quotation.status = status;
   await quotation.save();
+
+  // Notification of status change
+  await sendNotification({
+    userId: user._id,
+    title: 'Quotation Status Updated',
+    body: `Quotation ${quotation.quoteName} has been ${status}.`,
+    type: 'info'
+  });
 
   // If quotation is accepted, generate an invoice automatically
   if (status === 'accepted') {
@@ -449,6 +474,14 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
         html: createInvoiceEmail(invoice, invoiceUrl) //  TODO implement this function similar to createQuotationEmail
       });
 
+      // Notification of successful invoice creation
+      await sendNotification({
+        userId: user._id,
+        title: 'Invoice Created',
+        body: `Invoice ${invoice.invoiceName} has been created and sent successfully.`,
+        type: 'success'
+      });
+
       // Update invoice status to 'sent'
       invoice.status = 'sent';
       await invoice.save();
@@ -531,6 +564,15 @@ exports.editQuotation = asyncHandler(async (req, res) => {
   });
 
   await quotation.save();
+
+  // Notification of successful update
+  await sendNotification({
+    userId: userId,
+    title: 'Quotation Updated',
+    body: `Quotation ${quotation.quoteName} has been updated successfully.`,
+    type: 'info'
+  });
+
   res.status(200).json({ message: '✅ Quotation updated successfully', quotation });
 });
 
@@ -552,6 +594,14 @@ exports.softDeleteQuotation = asyncHandler(async (req, res) => {
   quotation.isDeleted = true;
   quotation.deletedAt = new Date();
   await quotation.save();
+
+  // Notification of successful deletion
+  await sendNotification({
+    userId: userId,
+    title: 'Quotation Deleted',
+    body: `Quotation ${quotation.quoteName} has been deleted successfully.`,
+    type: 'warning'
+  });
 
   res.status(200).json({ message: '🗑️ Quotation soft-deleted successfully' });
 });
@@ -606,6 +656,14 @@ exports.restoreQuotation = asyncHandler(async (req, res) => {
   quotation.isDeleted = false;
   quotation.deletedAt = null;
   await quotation.save();
+  
+  // Notification of successful restoration
+  await sendNotification({
+    userId: userId,
+    title: 'Quotation Restored',
+    body: `Quotation ${quotation.quoteName} has been restored successfully.`,
+    type: 'info'
+  });
 
   res.status(200).json({ message: '♻️ Quotation restored successfully', quotation });
 });

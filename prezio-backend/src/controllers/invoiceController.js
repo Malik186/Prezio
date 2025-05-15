@@ -8,6 +8,7 @@ const Template = require('../models/Template');
 const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const receiptController = require('./receiptController');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
+const { sendNotification } = require('../services/notificationService');
 const { createInvoiceEmail } = require('../utils/emailTemplates');
 const { recordPaymentHistory } = require('../utils/paymentHistoryManager');
 
@@ -52,6 +53,14 @@ exports.createInvoice = asyncHandler(async (req, res) => {
   const invoiceNumber = generateInvoiceNumber(nextNumber);
   user.lastInvoiceNumber = nextNumber;
   await user.save();
+
+  // Notification of Successful invoice creation
+  await sendNotification({
+    userId: user._id,
+    title: 'New Invoice Created',
+    body: `A new invoice has been created for you. Invoice Number: ${invoiceNumber}`,
+    type: 'success'
+  });
 
   let subtotal = 0;
   let tax = 0;
@@ -398,6 +407,14 @@ exports.sendInvoice = asyncHandler(async (req, res) => {
       html: createInvoiceEmail(invoice, invoiceUrl)
     });
 
+    // Send notification for successful sending
+    await sendNotification({
+      userId: user._id,
+      title: 'Invoice Sent',
+      body: `Invoice ${invoice.invoiceName} has been sent to ${clientEmail}`,
+      type: 'success'
+    });
+
     // Update invoice status to 'sent' if it was in 'draft'
     if (invoice.status === 'draft') {
       invoice.status = 'sent';
@@ -461,6 +478,15 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
       }
       invoice.__v = (__v || 0) + 1;
       await invoice.save();
+
+      // Send notification for cancellation
+      await sendNotification({
+        userId: user._id,
+        title: 'Invoice Canceled',
+        body: `Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has been canceled.`,
+        type: 'warning'
+      });
+
       return res.status(200).json({
         message: `✅ Invoice cancelled successfully`,
         invoice
@@ -517,6 +543,14 @@ exports.updateInvoicePaymentStatus = asyncHandler(async (req, res) => {
         notes,
         datePaid,
         userId: req.user._id
+      });
+
+      // Notification for payment
+      await sendNotification({
+        userId: user._id,
+        title: 'Payment Recorded',
+        body: `Payment of ${amountPaid} ${invoice.currency} received for Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}).`,
+        type: 'success'
       });
 
       // Update payment details
@@ -712,6 +746,14 @@ exports.editInvoice = asyncHandler(async (req, res) => {
 
   await invoice.save();
 
+  // Send notification for successful update
+  await sendNotification({
+    userId: userId,
+    title: 'Invoice Updated',
+    body: `Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has been updated.`,
+    type: 'info'
+  });
+
   res.status(200).json({
     message: '✅ Invoice updated successfully',
     invoice
@@ -736,6 +778,14 @@ exports.softDeleteInvoice = asyncHandler(async (req, res) => {
   invoice.isDeleted = true;
   invoice.deletedAt = new Date();
   await invoice.save();
+
+  // Send notification for successful deletion
+  await sendNotification({
+    userId: userId,
+    title: 'Invoice Deleted',
+    body: `Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has been deleted.`,
+    type: 'warning'
+  });
 
   res.status(200).json({ message: '🗑️ Invoice soft-deleted successfully' });
 });
@@ -791,6 +841,14 @@ exports.restoreInvoice = asyncHandler(async (req, res) => {
   invoice.deletedAt = null;
   await invoice.save();
 
+  // Send notification for successful restoration
+  await sendNotification({
+    userId: userId,
+    title: 'Invoice Restored',
+    body: `Invoice "${invoice.invoiceName}" (${invoice.invoiceNumber}) has been restored.`,
+    type: 'info'
+  });
+
   res.status(200).json({ message: '♻️ Invoice restored successfully', invoice });
 });
 
@@ -829,6 +887,14 @@ exports.createInvoiceFromQuotation = asyncHandler(async (req, res) => {
   const invoiceNumber = generateInvoiceNumber(nextNumber);
   user.lastInvoiceNumber = nextNumber;
   await user.save();
+  
+  // Notification of Successful invoice creation
+  await sendNotification({
+    userId: user._id,
+    title: 'New Invoice Created from Quotation',
+    body: `A new invoice has been created from ${quotation.quoteName}. Invoice Number: ${invoiceNumber}`,
+    type: 'success'
+  });
 
   // Create invoice from quotation data
   const invoiceData = {

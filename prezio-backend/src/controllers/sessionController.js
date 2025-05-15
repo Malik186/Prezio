@@ -1,5 +1,6 @@
 // src/controllers/sessionController.js
 const User = require('../models/User');
+const { sendNotification } = require('../services/notificationService');
 
 exports.getSessions = async (req, res) => {
   try {
@@ -24,6 +25,14 @@ exports.terminateSession = async (req, res) => {
 
     user.sessions.splice(sessionIndex, 1);
     await user.save();
+    
+    // Notification to the user about session termination
+    await sendNotification({
+      userId: user._id,
+      title: 'Session Termination',
+      body: `Session with ID ${sessionId} has been terminated.`,
+      type: 'success'
+    });
 
     res.json({ message: 'Session terminated successfully' });
   } catch (err) {

@@ -10,6 +10,7 @@ const User = require('../models/User');
 const Template = require('../models/Template');
 const validatePayload = require('../utils/validatePayload');
 const generateReceiptNumber = require('../utils/generateReceiptNumber');
+const { sendNotification } = require('../services/notificationService');
 const sendReceiptEmail = require('../utils/sendReceiptEmail');
 const { createReceiptEmail } = require('../utils/emailTemplates');
 const { recordPaymentHistory } = require('../utils/paymentHistoryManager');
@@ -177,6 +178,14 @@ exports.createReceipt = asyncHandler(async (req, res) => {
         invoice.payment.amountPaid = totalPaid;
         invoice.payment.datePaid = new Date();
         await invoice.save();
+
+        // Notication to client
+        await sendNotification({
+            userId: user._id,
+            title: 'Receipt created',
+            message: `Receipt ${receiptNumber} has been created for Invoice ${invoice.invoiceNumber}.`,
+            type: 'success'
+        });
     }
 
     try {
@@ -190,6 +199,13 @@ exports.createReceipt = asyncHandler(async (req, res) => {
             receipt.qrCodeUrl = qrCodeUrl;
             receipt.viewUrl = viewUrl;
             await receipt.save();
+            // Send Notification to client
+            await sendNotification({
+                userId: user._id,
+                title: 'Receipt created',
+                message: `Receipt ${receipt.receiptNumber} has been created.`,
+                type: 'success'
+            });
         }
 
         res.status(201).json({ message: '✅ Receipt created successfully', receipt });
@@ -217,6 +233,13 @@ exports.createReceipt = asyncHandler(async (req, res) => {
                 receipt.qrCodeUrl = qrCodeUrl;
                 receipt.viewUrl = viewUrl;
                 await receipt.save();
+                // Send Notification to client
+                await sendNotification({
+                    userId: user._id,
+                    title: 'Receipt created',
+                    message: `Receipt ${receipt.receiptNumber} has been created.`,
+                    type: 'success'
+                });
             }
 
             res.status(201).json({ message: '✅ Receipt created successfully', receipt });
@@ -369,6 +392,13 @@ exports.autoGenerateReceipt = asyncHandler(async (invoiceId, paymentDetails) => 
 
         // Send receipt to client
         await sendReceiptToClient(receipt._id);
+
+        await sendNotification({
+            userId: user._id,
+            title: 'Receipt created',
+            message: `Receipt ${receipt.receiptNumber} has been generated and Sent to client.`,
+            type: 'success'
+        });
 
         return receipt;
     } catch (error) {
@@ -636,6 +666,14 @@ exports.sendReceiptToClient = asyncHandler(async (req, res) => {
             html: createReceiptEmail(receipt, receiptUrl)
         });
 
+        // Send notification to user
+        await sendNotification({
+            userId: receipt.creator,
+            title: 'Receipt sent',
+            message: `Receipt ${receipt.receiptNumber} has been sent to ${clientEmail}.`,
+            type: 'success'
+        });
+
         if (res) {
             res.status(200).json({
                 success: true,
@@ -736,6 +774,14 @@ exports.softDeleteReceipt = asyncHandler(async (req, res) => {
     receipt.deletedAt = new Date();
     await receipt.save();
 
+    // Send notification to user
+    await sendNotification({
+        userId: userId,
+        title: 'Receipt deleted',
+        message: `Receipt ${receipt.receiptNumber} has been deleted.`,
+        type: 'warning'
+    });
+
     res.status(200).json({ message: '🗑️ Receipt soft-deleted successfully' });
 });
 
@@ -795,6 +841,14 @@ exports.restoreReceipt = asyncHandler(async (req, res) => {
     receipt.isDeleted = false;
     receipt.deletedAt = null;
     await receipt.save();
+    
+    // Send notification to user
+    await sendNotification({
+        userId: userId,
+        title: 'Receipt restored',
+        message: `Receipt ${receipt.receiptNumber} has been restored.`,
+        type: 'success'
+    });
 
     res.status(200).json({ message: '♻️ Receipt restored successfully', receipt });
 });
