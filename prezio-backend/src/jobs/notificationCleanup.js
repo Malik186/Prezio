@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Notification = require('../models/Notification');
 const safeCron = require('../utils/safeCron');
 const { registerCronJob } = require('../utils/cronManager');
+const { logActivity } = require('../utils/activityLogger');
 
 const startNotificationCleanupJob = () => {
   const schedule = '30 * * * *'; // Minute 30 of every hour
@@ -15,6 +16,16 @@ const startNotificationCleanupJob = () => {
     }).maxTimeMS(10000);
 
     if (result.deletedCount > 0) {
+      // Log the cleanup activity
+      await Notification.create({
+        action: 'NOTIFICATION_CLEANUP',
+        description: 'Notification cleanup job executed',
+        details: {
+          deletedNotifications: result.deletedCount
+        },
+        ip: 'Cron Job',
+        userAgent: 'Cron Job'
+      });
       console.log(`🧹 [Notification Cleanup] Deleted ${result.deletedCount} read notifications at ${new Date().toISOString()}`);
     }
   }));
