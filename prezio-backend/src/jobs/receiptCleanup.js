@@ -3,12 +3,14 @@ const Receipt = require('../models/Receipt');
 const safeCron = require('../utils/safeCron');
 const { registerCronJob } = require('../utils/cronManager');
 
+// This job permanently deletes receipts that have been soft-deleted for more than 30 days.
+// It runs daily at 4 AM.
 const startReceiptCleanupJob = () => {
-  // Runs daily at 4 AM to avoid conflict with other cleanup jobs
-  const job = cron.schedule('0 4 * * *', safeCron('Receipt Cleanup', async () => {
+  const schedule = '0 4 * * *'; // 4 AM daily
+
+  const job = cron.schedule(schedule, safeCron('Receipt Cleanup', async () => {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
 
-    // Find and delete soft-deleted receipts older than cutoff date
     const result = await Receipt.deleteMany({
       isDeleted: true,
       deletedAt: { $lte: cutoff }
@@ -16,14 +18,14 @@ const startReceiptCleanupJob = () => {
 
     console.log(`🧾 [Receipt Cleanup] Permanently deleted ${result.deletedCount} soft-deleted receipts.`);
 
-    //  TODO Optional: Send admin notification for large deletions
+    // Log a warning if more than 10 receipts are deleted at once
+    // This is to prevent accidental mass deletions.
     if (result.deletedCount > 10) {
       console.log(`⚠️ [Receipt Cleanup] Large deletion event: ${result.deletedCount} receipts removed.`);
     }
   }));
 
-  // Register the job with the cron manager
-  registerCronJob('Receipt Cleanup Job', job, 'System');
+  registerCronJob('Receipt Cleanup Job', job, 'System', schedule);
 };
 
 module.exports = startReceiptCleanupJob;
