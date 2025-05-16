@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Quotation = require('../models/Quotation');
 const safeCron = require('../utils/safeCron');
 const { registerCronJob } = require('../utils/cronManager');
+const { logActivity } = require('../utils/activityLogger');
 
 const startQuotationCleanupJob = () => {
   const schedule = '0 2 * * *'; // 2 AM daily
@@ -13,7 +14,16 @@ const startQuotationCleanupJob = () => {
       isDeleted: true,
       deletedAt: { $lte: cutoff }
     });
-
+    // Log the cleanup activity
+    await logActivity({
+      action: 'QUOTATION_CLEANUP',
+      description: 'Quotation cleanup job executed',
+      details: {
+        deletedQuotations: result.deletedCount
+      },
+      ip: 'Cron Job',
+      userAgent: 'Cron Job'
+    });
     console.log(`🧾 [Quotation Cleanup] Deleted ${result.deletedCount} soft-deleted quotations.`);
   }));
 

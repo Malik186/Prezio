@@ -1,13 +1,14 @@
 const asyncHandler = require('express-async-handler');
 const Template = require('../../models/Template');
 const { cloudinary } = require('../../config/cloudinary');
+const logActivity = require('../../utils/activityLogger');
 
 exports.uploadTemplate = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
 
   if (!req.files || !req.files.templateFile) {
-    return res.status(400).json({ 
-      message: '❌ Template file is required' 
+    return res.status(400).json({
+      message: '❌ Template file is required'
     });
   }
 
@@ -16,8 +17,8 @@ exports.uploadTemplate = asyncHandler(async (req, res) => {
 
     // Validate file type
     if (!templateFile.mimetype.includes('html')) {
-      return res.status(400).json({ 
-        message: '❌ Only HTML files are allowed' 
+      return res.status(400).json({
+        message: '❌ Only HTML files are allowed'
       });
     }
 
@@ -40,6 +41,15 @@ exports.uploadTemplate = asyncHandler(async (req, res) => {
 
     // Clean up temp file
     require('fs').unlinkSync(templateFile.tempFilePath);
+
+    // Log activity
+    await logActivity({
+      user: user._id,
+      action: 'UPLOAD_TEMPLATE',
+      description: `Template ${name} uploaded`,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     res.status(201).json({
       message: '✅ Template uploaded successfully',
@@ -91,6 +101,15 @@ exports.uploadInvoiceTemplate = asyncHandler(async (req, res) => {
       message: '✅ Invoice Template uploaded successfully',
       template: newTemplate
     });
+
+    await logActivity({
+      user: user._id,
+      action: 'UPLOAD_INVOICE_TEMPLATE',
+      description: 'Invoice template uploaded',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
   } catch (error) {
     console.error('Invoice Template upload error:', error);
     res.status(500).json({
@@ -118,6 +137,14 @@ exports.deleteTemplate = asyncHandler(async (req, res) => {
 
     // Delete from database
     await template.remove();
+
+    // Log activity
+    await logActivity({
+      user: user._id,
+      action: 'DELETE_TEMPLATE',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     res.json({
       message: '✅ Template deleted successfully'

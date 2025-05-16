@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Client = require('../models/Client');
 const safeCron = require('../utils/safeCron');
 const { registerCronJob } = require('../utils/cronManager');
+const { logActivity } = require('../utils/activityLogger');
 
 const startClientCleanupJob = () => {
   const schedule = '0 1 * * *'; // 1 AM daily
@@ -12,6 +13,17 @@ const startClientCleanupJob = () => {
     const result = await Client.deleteMany({
       isDeleted: true,
       deletedAt: { $lte: cutoff }
+    });
+
+    // Log the cleanup activity
+    await logActivity({
+      action: 'CLIENT_CLEANUP',
+      description: 'Client cleanup job executed',
+      details: {
+        deletedClients: result.deletedCount
+      },
+      ip: 'Cron Job',
+      userAgent: 'Cron Job'
     });
 
     console.log(`🧹 [Client Cleanup] Deleted ${result.deletedCount} soft-deleted clients.`);

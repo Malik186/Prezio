@@ -9,6 +9,7 @@ const Client = require('../models/Client');
 const User = require('../models/User');
 const Template = require('../models/Template');
 const validatePayload = require('../utils/validatePayload');
+const logActivity = require('../utils/activityLogger');
 const generateReceiptNumber = require('../utils/generateReceiptNumber');
 const { sendNotification } = require('../services/notificationService');
 const sendReceiptEmail = require('../utils/sendReceiptEmail');
@@ -186,6 +187,14 @@ exports.createReceipt = asyncHandler(async (req, res) => {
             message: `Receipt ${receiptNumber} has been created for Invoice ${invoice.invoiceNumber}.`,
             type: 'success'
         });
+
+        await logActivity({
+            user: user._id,
+            action: 'CREATE_RECEIPT',
+            description: 'Receipt created from Invoice',
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
+        });
     }
 
     try {
@@ -205,6 +214,14 @@ exports.createReceipt = asyncHandler(async (req, res) => {
                 title: 'Receipt created',
                 message: `Receipt ${receipt.receiptNumber} has been created.`,
                 type: 'success'
+            });
+
+            await logActivity({
+                user: user._id,
+                action: 'CREATE_RECEIPT',
+                description: 'Receipt created',
+                ip: req.ip,
+                userAgent: req.headers['user-agent']
             });
         }
 
@@ -398,6 +415,14 @@ exports.autoGenerateReceipt = asyncHandler(async (invoiceId, paymentDetails) => 
             title: 'Receipt created',
             message: `Receipt ${receipt.receiptNumber} has been generated and Sent to client.`,
             type: 'success'
+        });
+
+        await logActivity({
+            user: user._id,
+            action: 'AUTO_GENERATE_RECEIPT',
+            description: 'Auto-generated receipt from Invoice',
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
         });
 
         return receipt;
@@ -674,6 +699,14 @@ exports.sendReceiptToClient = asyncHandler(async (req, res) => {
             type: 'success'
         });
 
+        await logActivity({
+            user: user._id,
+            action: 'SEND_RECEIPT',
+            description: 'Receipt sent to client',
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
+        });
+
         if (res) {
             res.status(200).json({
                 success: true,
@@ -782,6 +815,14 @@ exports.softDeleteReceipt = asyncHandler(async (req, res) => {
         type: 'warning'
     });
 
+    await logActivity({
+        user: user._id,
+        action: 'DELETE_RECEIPT',
+        description: 'Receipt soft-deleted',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+    });
+
     res.status(200).json({ message: '🗑️ Receipt soft-deleted successfully' });
 });
 
@@ -841,13 +882,21 @@ exports.restoreReceipt = asyncHandler(async (req, res) => {
     receipt.isDeleted = false;
     receipt.deletedAt = null;
     await receipt.save();
-    
+
     // Send notification to user
     await sendNotification({
         userId: userId,
         title: 'Receipt restored',
         message: `Receipt ${receipt.receiptNumber} has been restored.`,
         type: 'success'
+    });
+
+    await logActivity({
+        user: user._id,
+        action: 'RESTORE_RECEIPT',
+        description: 'Receipt restored',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
     });
 
     res.status(200).json({ message: '♻️ Receipt restored successfully', receipt });

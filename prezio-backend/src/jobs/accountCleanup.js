@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const safeCron = require('../utils/safeCron');
 const { registerCronJob } = require('../utils/cronManager');
+const { logActivity } = require('../utils/activityLogger');
 
 const startAccountCleanupJob = () => {
   const schedule = '0 0 * * *'; // Midnight daily
@@ -18,6 +19,17 @@ const startAccountCleanupJob = () => {
       await User.findByIdAndDelete(user._id);
       console.log(`✅ [Account Cleanup] Deleted user: ${user.email}`);
     }
+
+    // Log the cleanup activity
+    await logActivity({
+      action: 'ACCOUNT_CLEANUP',
+      description: 'Account cleanup job executed',
+      details: {
+        deletedUsers: usersToDelete.map(user => user.email)
+      },
+      ip: 'Cron Job',
+      userAgent: 'Cron Job'
+    });
 
     console.log(`🧹 [Account Cleanup] Finished. Total deleted: ${usersToDelete.length}`);
   }));

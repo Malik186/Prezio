@@ -8,6 +8,7 @@ const Template = require('../models/Template');
 const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const receiptController = require('./receiptController');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
+const logActivity = require('../utils/activityLogger');
 const { sendNotification } = require('../services/notificationService');
 const { createInvoiceEmail } = require('../utils/emailTemplates');
 const { recordPaymentHistory } = require('../utils/paymentHistoryManager');
@@ -53,6 +54,14 @@ exports.createInvoice = asyncHandler(async (req, res) => {
   const invoiceNumber = generateInvoiceNumber(nextNumber);
   user.lastInvoiceNumber = nextNumber;
   await user.save();
+
+  await logActivity({
+    user: user._id,
+    action: 'CREATE_INVOICE',
+    description: 'New invoice created',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
 
   // Notification of Successful invoice creation
   await sendNotification({
@@ -121,6 +130,14 @@ exports.createInvoice = asyncHandler(async (req, res) => {
   }
 
   const invoice = await Invoice.create(invoiceData);
+
+  await logActivity({
+    user: user._id,
+    action: 'CREATE_INVOICE',
+    description: 'Invoice created successfully from Quote',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
 
   res.status(201).json({ message: '✅ Invoice created successfully', invoice });
 });
@@ -399,6 +416,14 @@ exports.sendInvoice = asyncHandler(async (req, res) => {
 
     // Create email subject with invoice name and company
     const emailSubject = `Invoice: ${invoice.invoiceName} from ${invoice.creatorSnapshot.companyName}`;
+
+    await logActivity({
+      user: user._id,
+      action: 'SEND_INVOICE',
+      description: 'Invoice sent to client',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     // Using sendInvoiceEmail utility
     await sendInvoiceEmail({
@@ -746,6 +771,14 @@ exports.editInvoice = asyncHandler(async (req, res) => {
 
   await invoice.save();
 
+  await logActivity({
+  user: user._id,
+  action: 'UPDATE_INVOICE',
+  description: 'Invoice updated',
+  ip: req.ip,
+  userAgent: req.headers['user-agent']
+});
+
   // Send notification for successful update
   await sendNotification({
     userId: userId,
@@ -778,6 +811,14 @@ exports.softDeleteInvoice = asyncHandler(async (req, res) => {
   invoice.isDeleted = true;
   invoice.deletedAt = new Date();
   await invoice.save();
+
+  await logActivity({
+  user: user._id,
+  action: 'DELETE_INVOICE',
+  description: 'Invoice soft-deleted',
+  ip: req.ip,
+  userAgent: req.headers['user-agent']
+});
 
   // Send notification for successful deletion
   await sendNotification({
@@ -841,6 +882,14 @@ exports.restoreInvoice = asyncHandler(async (req, res) => {
   invoice.deletedAt = null;
   await invoice.save();
 
+  await logActivity({
+  user: user._id,
+  action: 'RESTORE_INVOICE',
+  description: 'Invoice restored',
+  ip: req.ip,
+  userAgent: req.headers['user-agent']
+});
+
   // Send notification for successful restoration
   await sendNotification({
     userId: userId,
@@ -887,7 +936,15 @@ exports.createInvoiceFromQuotation = asyncHandler(async (req, res) => {
   const invoiceNumber = generateInvoiceNumber(nextNumber);
   user.lastInvoiceNumber = nextNumber;
   await user.save();
-  
+
+  await logActivity({
+  user: user._id,
+  action: 'CREATE_INVOICE_FROM_QUOTATION',
+  description: 'New invoice created from quotation',
+  ip: req.ip,
+  userAgent: req.headers['user-agent']
+});
+
   // Notification of Successful invoice creation
   await sendNotification({
     userId: user._id,

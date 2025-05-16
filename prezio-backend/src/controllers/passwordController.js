@@ -3,6 +3,7 @@ const PasswordReset = require('../models/PasswordReset');
 const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
 const generateCode = require('../utils/generateCode');
+const logActivity = require('../utils/activityLogger');
 const bcrypt = require('bcryptjs');
 const { createPasswordResetEmail } = require('../utils/emailTemplates');
 
@@ -22,6 +23,14 @@ exports.forgotPassword = async (req, res) => {
       { code, expiresAt },
       { upsert: true, new: true }
     );
+
+    await logActivity({
+      user: user._id,
+      action: 'PASSWORD_RESET_REQUEST',
+      description: 'Password reset code generated',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     await sendEmail({
       to: email,
@@ -61,7 +70,7 @@ exports.verifyCode = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
     });
-
+    
     res.status(200).json({ message: 'Code verified', user, token });
   } catch (err) {
     console.error(err);
@@ -83,6 +92,13 @@ exports.recoveryLogin = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+    });
+    await logActivity({
+      user: user._id,
+      action: 'RECOVERY_LOGIN',
+      description: 'User logged in with recovery key',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
     });
     res.status(200).json({ message: 'Logged in with recovery key', user, token });
   } catch (err) {

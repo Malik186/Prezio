@@ -11,6 +11,7 @@ const generateQuoteNumber = require('../utils/generateQuoteNumber');
 const generateInvoiceNumber = require('../utils/generateInvoiceNumber');
 const sendQuotationEmail = require('../utils/sendQuotationEmail');
 const sendInvoiceEmail = require('../utils/sendInvoiceEmail');
+const logActivity = require('../utils/activityLogger');
 const Invoice = require('../models/Invoice');
 const { sendNotification } = require('../services/notificationService');
 const { createQuotationEmail } = require('../utils/emailTemplates');
@@ -30,7 +31,7 @@ exports.createQuotation = asyncHandler(async (req, res) => {
     template: templateId
   } = req.body;
 
-  if (!clientId || !lineItems?.length || !validUntil || !currency || !quoteName || !projectDescription  || !notes || !templateId) {
+  if (!clientId || !lineItems?.length || !validUntil || !currency || !quoteName || !projectDescription || !notes || !templateId) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
@@ -52,6 +53,13 @@ exports.createQuotation = asyncHandler(async (req, res) => {
   user.lastQuoteNumber = nextNumber;
   await user.save();
 
+  await logActivity({
+    user: user._id,
+    action: 'CREATE_QUOTATION',
+    description: 'New quotation created',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
   // Notification of successful creation
   await sendNotification({
     userId: user._id,
@@ -329,6 +337,14 @@ exports.sendQuotation = asyncHandler(async (req, res) => {
       html: createQuotationEmail(quotation, quotationUrl)
     });
 
+    await logActivity({
+    user: user._id,
+    action: 'SEND_QUOTATION',
+    description: 'Quotation sent to client',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
     // Notification of successful sending
     await sendNotification({
       userId: req.user._id,
@@ -390,13 +406,21 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
     type: 'info'
   });
 
+  await logActivity({
+    user: user._id,
+    action: 'UPDATE_QUOTATION',
+    description: 'Quotation status updated',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
   // If quotation is accepted, generate an invoice automatically
   if (status === 'accepted') {
     try {
       // Create a due date 7 days from now (adjustable as needed)
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
-      
+
       //  TODO Create default payment details (this will need to be adjusted based on a user)
       const defaultPayment = {
         method: 'mpesa', // Default payment method
@@ -408,7 +432,7 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
         },
         status: 'pending'
       };
-      
+
       // Update lineItems structure for invoice
       // Remove applyTax property as it's not needed in invoice model
       const invoiceLineItems = quotation.lineItems.map(item => {
@@ -482,19 +506,28 @@ exports.updateQuotationStatus = asyncHandler(async (req, res) => {
         type: 'success'
       });
 
+      // Log activity for invoice creation
+      await logActivity({
+        user: user._id,
+        action: 'CREATE_INVOICE',
+        description: 'Invoice created from quotation',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
       // Update invoice status to 'sent'
       invoice.status = 'sent';
       await invoice.save();
 
-      return res.status(200).json({ 
-        message: `✅ Quotation ${status} successfully. Invoice created and sent.`, 
+      return res.status(200).json({
+        message: `✅ Quotation ${status} successfully. Invoice created and sent.`,
         quotation,
-        invoice 
+        invoice
       });
     } catch (error) {
       console.error('Error generating invoice:', error);
       // Still update quotation status even if invoice creation fails
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: `✅ Quotation ${status} successfully, but automatic invoice creation failed: ${error.message}`,
         quotation
       });
@@ -573,6 +606,14 @@ exports.editQuotation = asyncHandler(async (req, res) => {
     type: 'info'
   });
 
+  await logActivity({
+    user: user._id,
+    action: 'UPDATE_QUOTATION',
+    description: 'Quotation edited',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
   res.status(200).json({ message: '✅ Quotation updated successfully', quotation });
 });
 
@@ -601,6 +642,14 @@ exports.softDeleteQuotation = asyncHandler(async (req, res) => {
     title: 'Quotation Deleted',
     body: `Quotation ${quotation.quoteName} has been deleted successfully.`,
     type: 'warning'
+  });
+
+  await logActivity({
+    user: user._id,
+    action: 'DELETE_QUOTATION',
+    description: 'Quotation soft-deleted',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
   });
 
   res.status(200).json({ message: '🗑️ Quotation soft-deleted successfully' });
@@ -656,13 +705,21 @@ exports.restoreQuotation = asyncHandler(async (req, res) => {
   quotation.isDeleted = false;
   quotation.deletedAt = null;
   await quotation.save();
-  
+
   // Notification of successful restoration
   await sendNotification({
     userId: userId,
     title: 'Quotation Restored',
     body: `Quotation ${quotation.quoteName} has been restored successfully.`,
     type: 'info'
+  });
+
+  await logActivity({
+    user: user._id,
+    action: 'RESTORE_QUOTATION',
+    description: 'Quotation restored',
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
   });
 
   res.status(200).json({ message: '♻️ Quotation restored successfully', quotation });

@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const EmailLog = require('../models/EmailLog');
 
 // Initialize Resend client
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -22,6 +23,13 @@ const sendEmail = async ({ to, subject, text, html }) => {
 
   try {
     const response = await resend.emails.send(msg);
+
+    await EmailLog.create({
+      to,
+      subject,
+      type: 'Invoice',
+      status: 'sent'
+    });
     
     //console.log(`📩 Email sent successfully to ${to}`);
     return response;

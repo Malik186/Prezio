@@ -3,6 +3,7 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const User = require('../models/User');
 const { sendNotification } = require('../services/notificationService');
+const logActivity = require('../utils/activityLogger');
 
 exports.generate2FASecret = async (req, res) => {
   try {
@@ -101,6 +102,15 @@ exports.verify2FACode = async (req, res) => {
         type: 'success'
       });
 
+      // Log activity
+      await logActivity({
+        user: user._id,
+        action: 'ENABLE_2FA',
+        description: 'User enabled 2FA',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
       res.status(200).json({ message: '2FA enabled successfully' });
     }
   } catch (err) {
@@ -135,6 +145,15 @@ exports.disable2FA = async (req, res) => {
       title: 'Two-Factor Authentication Disabled',
       body: 'You have successfully disabled 2FA on your account.',
       type: 'warning'
+    });
+
+    // Log activity
+    await logActivity({
+      user: user._id,
+      action: 'DISABLE_2FA',
+      description: 'User disabled 2FA',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
     });
 
     res.status(200).json({ message: '2FA has been disabled successfully' });

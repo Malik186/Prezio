@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const getDeviceDetails = require('../utils/getDeviceDetails');
 const { sendNotification } = require('../services/notificationService');
+const logActivity = require('../utils/activityLogger');
 const crypto = require('crypto');
 const {
   createWelcomeEmail,
@@ -61,6 +62,14 @@ exports.register = async (req, res) => {
       to: user.email,
       subject: 'Welcome to Prezio!',
       html: createWelcomeEmail(user, plainKey)
+    });
+
+    await logActivity({
+      user: user._id,
+      action: 'SIGN_UP',
+      description: 'User signed up successfully',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
     });
 
     const token = generateToken(user._id);
@@ -138,6 +147,14 @@ exports.login = async (req, res) => {
         html: createLoginAlertEmail(user, ip, deviceString)
       });
 
+      await logActivity({
+        user: user._id,
+        action: 'LOGIN',
+        description: 'User logged in successfully',
+        ip: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
       await sendNotification({
         userId: user._id,
         title: 'New Device Login',
@@ -213,6 +230,14 @@ exports.updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     ).select('-password -recoveryKeyHash');
 
+    await logActivity({
+      user: user._id,
+      action: 'PROFILE_UPDATE',
+      description: 'User updated profile successfully',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
     res.status(200).json({ message: 'Profile updated', user: updatedUser });
   } catch (err) {
     console.error(err);
@@ -237,6 +262,15 @@ exports.changePassword = async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedNewPassword;
     await user.save();
+
+    // Log the password change
+    await logActivity({
+      user: user._id,
+      action: 'PASSWORD_RESET',
+      description: 'User changed password successfully',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     //Send Notification for Password Changed
     await sendNotification({
@@ -368,6 +402,14 @@ exports.terminateAccount = async (req, res) => {
     user.terminationDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
     await user.save();
 
+    await logActivity({
+      user: user._id,
+      action: 'ACCOUNT_TERMINATION_REQUEST',
+      description: 'User requested account termination',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
     await logSecurityEvent({
       userId: user._id,
       action: 'Account Termination Requested',
@@ -397,6 +439,14 @@ exports.abortTermination = async (req, res) => {
     user.terminationRequested = false;
     user.terminationDate = undefined;
     await user.save();
+
+    await logActivity({
+      user: user._id,
+      action: 'ACCOUNT_TERMINATION_ABORTED',
+      description: 'User aborted account termination',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     res.status(200).json({ message: 'Account termination cancelled successfully' });
   } catch (err) {

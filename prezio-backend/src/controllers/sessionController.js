@@ -1,6 +1,7 @@
 // src/controllers/sessionController.js
 const User = require('../models/User');
 const { sendNotification } = require('../services/notificationService');
+const logActivity = require('../utils/activityLogger');
 
 exports.getSessions = async (req, res) => {
   try {
@@ -32,6 +33,16 @@ exports.terminateSession = async (req, res) => {
       title: 'Session Termination',
       body: `Session with ID ${sessionId} has been terminated.`,
       type: 'success'
+    });
+
+    // Log activity
+    await logActivity({
+      user: user._id,
+      action: 'TERMINATE_SESSION',
+      description: `Session with ID ${sessionId} terminated`,
+      details: { sessionId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
     });
 
     res.json({ message: 'Session terminated successfully' });

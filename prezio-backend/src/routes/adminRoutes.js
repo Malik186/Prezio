@@ -1,10 +1,11 @@
 const express = require('express');
 const { listCronJobs } = require('../utils/cronManager');
-const { 
-  uploadTemplate, 
+const {
+  uploadTemplate,
   uploadInvoiceTemplate,
-  deleteTemplate 
+  deleteTemplate
 } = require('../controllers/admin/templateController');
+const { getAdminDashboardStats } = require('../controllers/admin/adminController');
 const { fileUploadMiddleware } = require('../config/cloudinary');
 const protect = require('../middleware/authMiddleware');
 const router = express.Router();
@@ -15,27 +16,35 @@ router.get('/cron-jobs', protect, protect.adminOnly, (req, res) => {
   res.status(200).json(jobs);
 });
 
+// Admin dashboard route
+router.get(
+  '/dashboard',
+  protect,
+  protect.adminOnly,
+  getAdminDashboardStats
+);
+
 // Template routes
 router.post(
-  '/upload-template', 
-  protect, 
-  protect.adminOnly, 
-  fileUploadMiddleware, 
+  '/upload-template',
+  protect,
+  protect.adminOnly,
+  fileUploadMiddleware,
   uploadTemplate
 );
 
 router.post(
-  '/templates/invoice/upload', 
-  protect, 
+  '/templates/invoice/upload',
+  protect,
   protect.adminOnly,
-  fileUploadMiddleware, 
+  fileUploadMiddleware,
   uploadInvoiceTemplate
 );
 
 router.delete(
-  '/templates/:id', 
-  protect, 
-  protect.adminOnly, 
+  '/templates/:id',
+  protect,
+  protect.adminOnly,
   deleteTemplate
 );
 
